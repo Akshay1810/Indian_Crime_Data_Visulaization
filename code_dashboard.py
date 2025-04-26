@@ -1322,7 +1322,7 @@ link_inputs = [Input(f"link-{val}", "n_clicks") for val in tab_values if val] # 
 if link_inputs: # Only register if inputs were created
     app.clientside_callback(
         ClientsideFunction(namespace='clientside', function_name='handleDrawerLinkClick'),
-        Output("main-tabs", "value"), # Update the active tab
+        Output("main-tabs", "value"),
         Output("slide-out-drawer", "className", allow_duplicate=True), # Close drawer
         Output("drawer-overlay", "className", allow_duplicate=True), # Hide overlay
         *link_inputs,
@@ -1342,7 +1342,7 @@ if link_outputs: # Only register if outputs exist
         link_outputs,
         Input("main-tabs", "value"),
         *link_id_states,
-        prevent_initial_call='initial_duplicate' # Allows initial call with allow_duplicate
+        prevent_initial_call='initial_duplicate' 
     )
 else:
      print("Warning: No link outputs generated for active link style callback.")
@@ -1360,19 +1360,17 @@ def update_year_crime_types(category):
     """Dynamically update crime type dropdown options based on selected category."""
     if category not in crime_options:
         return []
-    # Add 'TOTAL_CRIMES' as an option for every category
     opts = [{"label": "TOTAL CRIMES", "value": "TOTAL_CRIMES"}]
     opts.extend([{"label": x.replace("_", " ").title(), "value": x} for x in crime_options.get(category, [])])
     return opts
 
-# Set default value for year-crime-type-dropdown (optional, but good UX)
+# Set default value for year-crime-type-dropdown
 @app.callback(
     Output("year-crime-type-dropdown", "value"),
     Input("year-crime-type-dropdown", "options"),
 )
 def set_default_year_crime_type(options):
      if options:
-         # Default to 'TOTAL_CRIMES' if available, else the first option
          default_value = next((opt['value'] for opt in options if opt['value'] == 'TOTAL_CRIMES'), options[0]['value'])
          return default_value
      return None
@@ -1391,45 +1389,33 @@ def update_year_visualizations(year_range, category, crime_type, viz_type):
         return html.Div("Please select year range, category, crime type, and visualization type.",
                        style={'padding': '20px', 'color': '#777777', 'fontStyle': 'italic', 'textAlign':'center'})
 
-    # Get the correct dataframe
     df = dataframes.get(category)
     if df is None:
         return html.Div(f"Error: Data for category '{category}' not found.", style={'color': 'red', 'textAlign':'center'})
-
-    # Ensure the selected crime_type exists in the dataframe (or is TOTAL_CRIMES)
     if crime_type != 'TOTAL_CRIMES' and crime_type not in df.columns:
-         # Check if it's a known option for the category but just missing from this specific DF (edge case)
          if crime_type in crime_options.get(category, []):
              return html.Div(f"Warning: Crime type '{crime_type.replace('_',' ').title()}' selected but not found in the '{category.upper()}' dataset for the chosen years. It might have only zero values or be missing.",
                              style={'padding': '20px', 'color': 'orange', 'textAlign':'center'})
          else:
-            # This case should ideally not happen if dropdowns are populated correctly
             return html.Div(f"Error: Selected crime type '{crime_type}' is invalid for category '{category.upper()}'.",
                            style={'padding': '20px', 'color': 'red', 'textAlign':'center'})
 
-
-    # Convert year values to strings for filtering
-    # Handle single year selection vs range
     min_year, max_year = year_range
     years = [str(year) for year in range(min_year, max_year + 1)]
 
-
-    # Filter dataframe for the selected years
-    df_years = df[df["YEAR"].isin(years)].copy() # Use .copy() to avoid SettingWithCopyWarning
+    df_years = df[df["YEAR"].isin(years)].copy()
 
     if df_years.empty:
         return html.Div(f"No data available for {category.upper()} crimes between {min_year} and {max_year}.",
                        style={'padding': '20px', 'color': '#777777', 'fontStyle': 'italic', 'textAlign':'center'})
 
     # Use the specific crime type or the calculated TOTAL_CRIMES
-    target_crime_col = crime_type # This will be 'TOTAL_CRIMES' if selected, or a specific crime type
+    target_crime_col = crime_type 
 
 
     # --- Visualization Logic ---
     graphs = []
     crime_label = target_crime_col.replace('_', ' ').title() # For titles and labels
-
-    # General Card Style
     card_style = {
         'backgroundColor': '#ffffff',
         'borderRadius': '8px',
@@ -1457,29 +1443,28 @@ def update_year_visualizations(year_range, category, crime_type, viz_type):
         )
         line_fig.update_traces(
             line=dict(color='#1f77b4', width=3), mode='lines+markers', marker=dict(size=8),
-            hovertemplate='Year: %{x}<br>' + crime_label + ': %{y:,}<extra></extra>' # Added comma formatting
+            hovertemplate='Year: %{x}<br>' + crime_label + ': %{y:,}<extra></extra>' 
         )
         graphs.append(html.Div(dcc.Graph(figure=line_fig), className="card-container", style=card_style))
 
-        # Year-over-year percentage change (only if more than one year)
         if len(trend_df) > 1:
             trend_df['YOY_CHANGE'] = trend_df[target_crime_col].pct_change() * 100
             # Handle potential division by zero or infinite values if previous year was 0
-            trend_df['YOY_CHANGE'] = trend_df['YOY_CHANGE'].replace([float('inf'), -float('inf')], None) # Replace infinities with None/NaN
-            trend_df_yoy = trend_df.dropna(subset=['YOY_CHANGE']) # Drop rows where change couldn't be calculated
+            trend_df['YOY_CHANGE'] = trend_df['YOY_CHANGE'].replace([float('inf'), -float('inf')], None) 
+            trend_df_yoy = trend_df.dropna(subset=['YOY_CHANGE']) 
 
             if not trend_df_yoy.empty:
-                # Determine bar colors based on change
-                bar_colors = ['#2ca02c' if x >= 0 else '#d62728' for x in trend_df_yoy['YOY_CHANGE']] # Green for increase, Red for decrease
+                
+                bar_colors = ['#2ca02c' if x >= 0 else '#d62728' for x in trend_df_yoy['YOY_CHANGE']] 
 
                 yoy_fig = px.bar(trend_df_yoy, x="YEAR", y="YOY_CHANGE",
-                               title=f"Year-over-Year % Change in {crime_label} ({min_year+1}–{max_year})") # Adjust title year range
+                               title=f"Year-over-Year % Change in {crime_label} ({min_year+1}–{max_year})") 
 
                 yoy_fig.update_layout(
                     plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', font={'color': '#333333'},
                     title={'font': {'size': 18, 'color': '#1f77b4'}, 'x': 0.5, 'xanchor': 'center'},
                     margin={'l': 40, 'r': 40, 't': 60, 'b': 40},
-                    xaxis={'gridcolor': '#f0f0f0', 'title': 'Year', 'tickmode': 'linear'}, # Ensure all years show if space allows
+                    xaxis={'gridcolor': '#f0f0f0', 'title': 'Year', 'tickmode': 'linear'}, 
                     yaxis={'gridcolor': '#f0f0f0', 'title': '% Change'}
                 )
                 yoy_fig.update_traces(
@@ -1492,7 +1477,7 @@ def update_year_visualizations(year_range, category, crime_type, viz_type):
 
     # === State Comparison ===
     elif viz_type == "state_comparison":
-        # Aggregate by state over the selected years
+        # Aggregating by state over the selected years
         state_agg = df_years.groupby("STATE")[target_crime_col].sum().reset_index()
         top_states = state_agg.sort_values(target_crime_col, ascending=False).head(15) # Show top 15 states
 
@@ -1511,11 +1496,10 @@ def update_year_visualizations(year_range, category, crime_type, viz_type):
 
         # Pie chart for contribution of top 5 states
         top5_states_df = state_agg.sort_values(target_crime_col, ascending=False).head(5)
-        # Calculate 'Other' category for the rest
         total_top5 = top5_states_df[target_crime_col].sum()
         total_all = state_agg[target_crime_col].sum()
         other_val = total_all - total_top5
-        if other_val > 0 and len(state_agg) > 5: # Only add 'Other' if there are more than 5 states and 'Other' has value
+        if other_val > 0 and len(state_agg) > 5:
              other_df = pd.DataFrame([{'STATE': 'Other States', target_crime_col: other_val}])
              pie_data = pd.concat([top5_states_df, other_df], ignore_index=True)
         else:
@@ -1523,35 +1507,33 @@ def update_year_visualizations(year_range, category, crime_type, viz_type):
 
         pie_fig = px.pie(pie_data, values=target_crime_col, names='STATE',
                         title=f"Contribution of Top 5 States to Total {crime_label} ({min_year}–{max_year})",
-                        hole=0.3) # Add a donut hole
+                        hole=0.3) 
 
         pie_fig.update_traces(textposition='inside', textinfo='percent+label',
-                             hovertemplate='<b>%{label}</b><br>Total: %{value:,}<br>Percentage: %{percent:.1%}<extra></extra>') # Improved hover
+                             hovertemplate='<b>%{label}</b><br>Total: %{value:,}<br>Percentage: %{percent:.1%}<extra></extra>') 
         pie_fig.update_layout(
             plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', font={'color': '#333333'},
             title={'font': {'size': 18, 'color': '#1f77b4'}, 'x': 0.5, 'xanchor': 'center'},
             margin={'l': 40, 'r': 40, 't': 60, 'b': 40},
-            legend={'orientation': 'v', 'yanchor':'top', 'y':0.7, 'xanchor':'left', 'x':-0.1} # Vertical legend to the side
+            legend={'orientation': 'v', 'yanchor':'top', 'y':0.7, 'xanchor':'left', 'x':-0.1} #legend
         )
         graphs.append(html.Div(dcc.Graph(figure=pie_fig), className="card-container", style=card_style))
 
 
     # === Crime Type Breakdown ===
     elif viz_type == "crime_breakdown":
-        # Use all crime types defined for the selected category
         all_crime_types = crime_options[category]
-        # Ensure these columns actually exist in the filtered df_years
         valid_crime_types = [ct for ct in all_crime_types if ct in df_years.columns]
 
         if not valid_crime_types:
              graphs.append(html.Div(f"No specific crime type data found for {category.upper()} category in the selected years.", style={**card_style, 'fontStyle':'italic', 'color':'grey'}))
         else:
-            # Aggregate sum for each valid crime type over the selected years
+            # Aggregating sum for each valid crime type over the selected years
             breakdown_data = df_years[valid_crime_types].sum().reset_index()
             breakdown_data.columns = ['CRIME_TYPE', 'TOTAL_COUNT']
             breakdown_data = breakdown_data[breakdown_data['TOTAL_COUNT'] > 0] # Only show crimes with counts > 0
             breakdown_data = breakdown_data.sort_values('TOTAL_COUNT', ascending=False)
-            breakdown_data['CRIME_LABEL'] = breakdown_data['CRIME_TYPE'].str.replace('_', ' ').str.title() # Create clean labels
+            breakdown_data['CRIME_LABEL'] = breakdown_data['CRIME_TYPE'].str.replace('_', ' ').str.title() 
 
             # Pie chart for distribution of crime types
             pie_fig = px.pie(breakdown_data, values='TOTAL_COUNT', names='CRIME_LABEL',
@@ -1568,7 +1550,7 @@ def update_year_visualizations(year_range, category, crime_type, viz_type):
             )
             graphs.append(html.Div(dcc.Graph(figure=pie_fig), className="card-container", style=card_style))
 
-            # Horizontal bar chart for top N crime types (e.g., top 10)
+            # Horizontal bar chart for top N crime types 
             top_n_crimes = breakdown_data.head(10)
             bar_fig = px.bar(top_n_crimes, y='CRIME_LABEL', x='TOTAL_COUNT', orientation='h',
                             title=f"Top 10 {category.upper()} Crime Types by Count ({min_year}–{max_year})")
@@ -1597,7 +1579,6 @@ def update_year_visualizations(year_range, category, crime_type, viz_type):
 def update_state_map(selected_category):
     """Updates the main state choropleth map based on the selected crime category."""
     if selected_category not in dataframes:
-        # Return a default empty map or a map indicating an error
         fig = go.Figure()
         fig.update_layout(title=f"Error: Data for '{selected_category}' not found.", title_x=0.5)
         fig.update_geos(visible=False) # Hide geo outlines
@@ -1605,11 +1586,10 @@ def update_state_map(selected_category):
 
     df = dataframes[selected_category]
 
-    # Aggregate data by state for the selected category's total crimes
-    # Use all years available in the dataframe for the map aggregation
+    # Aggregating data by state for the selected category's total crimes
+    # Used all years available in the dataframe for the map aggregation
     state_summary = df.groupby("STATE")["TOTAL_CRIMES"].sum().reset_index()
 
-    # Check if GeoJSON is loaded
     if not india_state_geo or 'features' not in india_state_geo:
          fig = go.Figure()
          fig.update_layout(title="Error: State GeoJSON data could not be loaded.", title_x=0.5)
@@ -1617,11 +1597,10 @@ def update_state_map(selected_category):
          return fig
 
 
-    # Determine color scale range dynamically (optional, but can improve contrast)
-    # You might want to cap the max value or use quantiles for better color distribution
+    # Determine color scale range dynamically
     min_z = 0
-    max_z = state_summary["TOTAL_CRIMES"].quantile(0.95) # Use 95th percentile as max to handle outliers
-    if max_z == 0: max_z = state_summary["TOTAL_CRIMES"].max() # Handle case where 95th percentile is 0
+    max_z = state_summary["TOTAL_CRIMES"].quantile(0.95) 
+    if max_z == 0: max_z = state_summary["TOTAL_CRIMES"].max() 
 
 
     fig = go.Figure(go.Choropleth(
@@ -1633,29 +1612,28 @@ def update_state_map(selected_category):
         marker_line_color="#d4d4d4",
         marker_line_width=0.5,
         zmin=min_z,
-        zmax=max_z, # Use calculated max
-        zauto=False, # Disable auto-scaling of z
+        zmax=max_z,
+        zauto=False,
         colorbar_title=f"Total {selected_category.upper()} Crimes<br>(All Years)",
         customdata=state_summary["STATE"], # Pass state name for hover
         hovertemplate = '<b>State:</b> %{customdata}<br>' +
-                        f'<b>Total {selected_category.upper()} Crimes:</b> %{{z:,}}<br>' + # Add category name and formatting
+                        f'<b>Total {selected_category.upper()} Crimes:</b> %{{z:,}}<br>' + 
                         '<extra></extra>' # Remove trace info
     ))
 
     fig.update_geos(
-        visible=False, # Start with base map invisible, fitbounds will make it visible
+        visible=False, 
         scope="asia",
         projection_type="mercator",
-        # center={"lat": 22, "lon": 80}, # Centering might not be needed with fitbounds
-        lataxis_range=[5, 38], # Approximate latitude range for India
-        lonaxis_range=[67, 99], # Approximate longitude range for India
-        bgcolor='rgba(0,0,0,0)', # Transparent background for geos
-        fitbounds="locations" # Fit map to the locations with data
+        lataxis_range=[5, 38], #latitude range for India
+        lonaxis_range=[67, 99], #longitude range for India
+        bgcolor='rgba(0,0,0,0)', 
+        fitbounds="locations" 
     )
 
     fig.update_layout(
         paper_bgcolor="#ffffff",
-        plot_bgcolor="#ffffff", # Ensure plot background is white
+        plot_bgcolor="#ffffff", 
         margin={"r":10, "t":40, "l":10, "b":10},
         title={
             "text": f"Aggregate {selected_category.upper()} Crimes by State (All Years)",
@@ -1663,7 +1641,7 @@ def update_state_map(selected_category):
             "x": 0.5,
             "xanchor": "center"
         },
-        geo=dict(bgcolor= 'rgba(0,0,0,0)') # Ensure geo background remains transparent
+        geo=dict(bgcolor= 'rgba(0,0,0,0)') 
     )
 
     return fig
@@ -1672,32 +1650,22 @@ def update_state_map(selected_category):
 @app.callback(
     [Output("selected-state-store", "data"),
      Output("selected-state-display", "children"),
-     Output("state-analysis-options", "children")], # Populate the options container
+     Output("state-analysis-options", "children")],
     [Input("state-map", "clickData"),
-     Input("state-category-radio", "value")], # Also depends on category now
+     Input("state-category-radio", "value")], 
 )
 def state_selected(clickData, selected_category):
     """Handles clicks on the state map to select a state and show further analysis options."""
-    # Use dash.callback_context to check which input triggered the callback
-    # ctx = dash.callback_context
-    # triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
-
-    # We only want to update options when a map click happens
-    # If the category changes, we don't necessarily reset the selection, but the analysis below will update
     if not clickData:
-        # If no click, return default states (no state selected, empty options)
-        # Keep previously selected state if category changes? Or reset? Resetting seems clearer.
         return None, "Click on a state in the map to see details.", ""
 
     state_val = clickData["points"][0]["location"]
     display_text = f"Selected State: {state_val} (Category: {selected_category.upper()})"
 
-    # Get the relevant dataframe
     df = dataframes.get(selected_category)
     if df is None or state_val not in df['STATE'].unique():
-        # Handle case where state exists in GeoJSON but not in the selected category's data
         options_content = html.Div(f"No data available for {state_val} in the {selected_category.upper()} dataset.", style={'color':'orange'})
-        return state_val, display_text, options_content # Store state but show message
+        return state_val, display_text, options_content 
 
     # Get available years for the selected state and category
     years_available = sorted(df[df["STATE"] == state_val]["YEAR"].unique())
@@ -1724,24 +1692,22 @@ def state_selected(clickData, selected_category):
         max=max_yr,
         value=slider_value,
         marks=marks,
-        step=1 if min_yr != max_yr else None, # Allow step=1 if range exists
+        step=1 if min_yr != max_yr else None, 
         allowCross=False,
         tooltip={"placement": "bottom", "always_visible": True}
     )
 
-    # Crime type dropdown options for the selected category
     state_crime_options = [{"label": "TOTAL CRIMES", "value": "TOTAL_CRIMES"}]
     state_crime_options.extend([{"label": x.replace("_", " ").title(), "value": x} for x in crime_options.get(selected_category, [])])
 
     crime_type_dd = dcc.Dropdown(
         id="state-crime-type-dropdown", # New ID
         options=state_crime_options,
-        value="TOTAL_CRIMES", # Default to total
+        value="TOTAL_CRIMES",
         clearable=False,
         style=dropdown_style # Use common style
     )
 
-    # Assemble the options div
     options_content = html.Div([
         html.H4(f"Analyze {state_val} ({selected_category.upper()})", style={'textAlign':'center', 'marginBottom':'15px'}),
         html.Label("Select Year Range:", style={'fontWeight':'bold'}), year_slider,
@@ -1754,23 +1720,22 @@ def state_selected(clickData, selected_category):
 # Callback to update state-specific visualizations based on selections in the options div
 @app.callback(
     Output("state-visualizations-container", "children"),
-    [Input("state-year-slider", "value"),         # From the dynamically created slider
-     Input("state-crime-type-dropdown", "value")], # From the dynamically created dropdown
-    [State("selected-state-store", "data"),      # The currently selected state
-     State("state-category-radio", "value")],    # The overall category selected
+    [Input("state-year-slider", "value"),         
+     Input("state-crime-type-dropdown", "value")], 
+    [State("selected-state-store", "data"),      
+     State("state-category-radio", "value")],    
 )
 def update_state_visualizations(year_range, crime_type, selected_state, selected_category):
     """Generates visualizations (bar/line charts) for the selected state, category, years, and crime type."""
-    # print(f"State Viz Update: State={selected_state}, Cat={selected_category}, Year={year_range}, Crime={crime_type}") # Debug print
+
 
     if not selected_state or not year_range or not crime_type or not selected_category:
-        return "" # Return empty if any input is missing
+        return "" 
 
     df = dataframes.get(selected_category)
     if df is None:
         return html.Div(f"Error: Data for category '{selected_category}' not found.", style={'color': 'red', 'textAlign':'center'})
 
-    # Filter data for the selected state and years
     min_year, max_year = year_range
     years = [str(year) for year in range(min_year, max_year + 1)]
     df_state_years = df[(df["STATE"] == selected_state) & (df["YEAR"].isin(years))].copy()
@@ -1782,7 +1747,6 @@ def update_state_visualizations(year_range, crime_type, selected_state, selected
     # Check if the selected crime type exists
     target_crime_col = crime_type
     if target_crime_col not in df_state_years.columns:
-         # TOTAL_CRIMES should always exist due to preprocessing
          return html.Div(f"Error: Crime type '{target_crime_col}' not found in data for {selected_state}, {selected_category.upper()}. This shouldn't happen.",
                         style={'color': 'red', 'textAlign':'center'})
 
@@ -1790,20 +1754,20 @@ def update_state_visualizations(year_range, crime_type, selected_state, selected
     crime_label = target_crime_col.replace('_', ' ').title()
     year_label = f"{min_year}–{max_year}" if min_year != max_year else str(min_year)
 
-    card_style = { # Consistent card styling
+    card_style = { 
         'backgroundColor': '#ffffff', 'borderRadius': '8px', 'boxShadow': '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)',
         'padding': '15px', 'marginBottom': '20px'
     }
 
     # --- Visualization 1: Crime Count by District (Bar Chart) ---
-    # Aggregate by district for the selected state/years/crime
+    
     district_agg = df_state_years.groupby("DISTRICT")[target_crime_col].sum().reset_index()
-    # Filter out districts with 0 crime for this selection to avoid clutter
+    
     district_agg = district_agg[district_agg[target_crime_col] > 0].sort_values(target_crime_col, ascending=False)
 
     if not district_agg.empty:
         bar_title = f"{crime_label} by District in {selected_state} ({year_label})"
-        bar_fig = px.bar(district_agg.head(20), x="DISTRICT", y=target_crime_col, # Show top 20 districts
+        bar_fig = px.bar(district_agg.head(20), x="DISTRICT", y=target_crime_col, 
                         title=bar_title)
         bar_fig.update_layout(
             plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', font={'color': '#333333'},
@@ -1819,14 +1783,13 @@ def update_state_visualizations(year_range, crime_type, selected_state, selected
 
 
     # --- Visualization 2: Trend Over Selected Years (Line Chart) ---
-    # Only show trend line if a range of years is selected
     if min_year != max_year:
-        # Aggregate by year for the selected state/crime
+        
         trend_df = df_state_years.groupby("YEAR")[target_crime_col].sum().reset_index()
         trend_df = trend_df.sort_values("YEAR")
-        trend_df['YEAR'] = pd.to_numeric(trend_df['YEAR']) # Ensure numeric for plotting
+        trend_df['YEAR'] = pd.to_numeric(trend_df['YEAR']) 
 
-        if len(trend_df) > 1: # Need at least 2 points for a line
+        if len(trend_df) > 1: 
             line_title = f"Trend of {crime_label} in {selected_state} ({year_label})"
             line_fig = px.line(trend_df, x="YEAR", y=target_crime_col, title=line_title, markers=True)
             line_fig.update_layout(
@@ -1854,8 +1817,8 @@ def update_state_visualizations(year_range, crime_type, selected_state, selected
      Output('district-year-slider', 'marks'),
      Output('district-crime-dropdown', 'options'),
      Output('district-crime-dropdown', 'value'),
-     Output('compare-districts-multi', 'options'), # UPDATED: Output for multi-select dropdown
-     Output('compare-districts-multi', 'value'),   # UPDATED: Reset multi-select value
+     Output('compare-districts-multi', 'options'), 
+     Output('compare-districts-multi', 'value'),   
      Output('crime-hotspot-dropdown', 'options'),
      Output('crime-hotspot-dropdown', 'value')],
     [Input('district-category-radio', 'value')]
@@ -1866,31 +1829,26 @@ def update_district_controls(category):
     based on the selected category.
     """
     if category not in dataframes:
-        # Return default/empty values if category data is missing
         default_marks = {2001: '2001', 2013: '2013'}
         return 2001, 2013, [2001, 2013], default_marks, [], 'TOTAL_CRIMES', [], None, [], None
 
     df = dataframes[category]
 
-    # Get unique years, convert to int, find min/max
     try:
         years = sorted([int(y) for y in df['YEAR'].unique() if str(y).isdigit()])
-        if not years: # Handle case where no valid years found
+        if not years: 
              raise ValueError("No valid integer years found in data")
         min_yr, max_yr = min(years), max(years)
     except Exception as e:
         print(f"Error processing years for category {category}: {e}")
-        # Fallback to default years if processing fails
         min_yr, max_yr = 2001, 2013
         years = list(range(min_yr, max_yr + 1))
 
-    # Create marks for slider
     marks = {yr: {'label': str(yr), 'style': {'transform': 'rotate(45deg)', 'color': '#1f77b4', 'whiteSpace': 'nowrap'}}
-             for yr in years if yr % 2 == 0 or yr == min_yr or yr == max_yr} # Mark every other year + ends
+             for yr in years if yr % 2 == 0 or yr == min_yr or yr == max_yr} 
 
     # Crime options for the main dropdown (including TOTAL_CRIMES)
     crime_opts_list = crime_options.get(category, [])
-    # Ensure TOTAL_CRIMES column exists before adding it as an option
     crime_opts = []
     if 'TOTAL_CRIMES' in df.columns:
          crime_opts.append({"label": "TOTAL CRIMES", "value": "TOTAL_CRIMES"})
@@ -1900,7 +1858,7 @@ def update_district_controls(category):
 
     # Crime options for hotspot analysis (excluding TOTAL_CRIMES)
     hotspot_crime_opts = [{"label": x.replace("_", " ").title(), "value": x}
-                          for x in crime_opts_list if x in df.columns] # Only include if column exists
+                          for x in crime_opts_list if x in df.columns] 
 
     # District options for the multi-select comparison dropdown
     district_opts = []
@@ -1914,7 +1872,7 @@ def update_district_controls(category):
     return min_yr, max_yr, [min_yr, max_yr], marks, crime_opts, default_crime_value, district_opts, [], hotspot_crime_opts, None # Return empty list [] for multi-select value
 
 
-# Callback to update the District Map (MODIFIED to handle missing districts)
+# Callback to update the District Map 
 @app.callback(
     Output("district-map", "figure"),
     [Input("district-category-radio", "value"),
@@ -1933,8 +1891,6 @@ def update_district_map_detailed(selected_category, year_range, selected_crime):
     if not india_district_geo or 'features' not in india_district_geo:
          return go.Figure().update_layout(title="Error: District GeoJSON data could not be loaded.", title_x=0.5, xaxis_visible=False, yaxis_visible=False)
 
-    # Get all district names from GeoJSON properties
-    # Ensure the key 'DISTRICT_UPPER' matches your normalize_geojson function output
     try:
         all_geojson_districts = [
             feat['properties']['DISTRICT_UPPER']
@@ -1943,7 +1899,6 @@ def update_district_map_detailed(selected_category, year_range, selected_crime):
         ]
         if not all_geojson_districts:
              raise ValueError("No districts found in GeoJSON features properties.")
-        # Create a DataFrame from GeoJSON districts for merging
         geojson_districts_df = pd.DataFrame({'DISTRICT': all_geojson_districts})
     except Exception as e:
         print(f"Error extracting districts from GeoJSON: {e}")
@@ -1952,16 +1907,15 @@ def update_district_map_detailed(selected_category, year_range, selected_crime):
 
     # Basic validation for inputs
     if not selected_category or not year_range or not selected_crime:
-        # If controls haven't fully initialized, show a blank map with all districts (value 0)
         print("Map Update: Controls not fully initialized, showing blank map.")
         fig = go.Figure(go.Choropleth(
             geojson=india_district_geo,
             locations=geojson_districts_df["DISTRICT"],
-            z=pd.Series([0] * len(geojson_districts_df)), # Assign 0 to all
+            z=pd.Series([0] * len(geojson_districts_df)), 
             featureidkey="properties.DISTRICT_UPPER",
-            colorscale=[[0, 'rgb(240,240,240)'], [1, 'rgb(240,240,240)']], # Use a single light grey color
+            colorscale=[[0, 'rgb(240,240,240)'], [1, 'rgb(240,240,240)']], 
             colorbar_title="No Data Selected",
-            showscale=False, # Hide scale for blank map
+            showscale=False, 
             customdata=geojson_districts_df["DISTRICT"],
             hovertemplate = '<b>District:</b> %{customdata}<br>No Data Selected<extra></extra>'
         ))
@@ -1981,12 +1935,12 @@ def update_district_map_detailed(selected_category, year_range, selected_crime):
     df_filtered = df[df["YEAR"].isin(years)].copy()
 
     # Determine the crime column to aggregate
-    crime_col = selected_crime # Already defaults to TOTAL_CRIMES from previous callback
+    crime_col = selected_crime 
 
     if crime_col not in df_filtered.columns:
-        # This case should be less likely now due to checks in update_district_controls
+        
         print(f"Warning: Column '{crime_col}' not found for map. Check data consistency.")
-        # Show blank map if column is unexpectedly missing
+        
         fig = go.Figure(go.Choropleth(
             geojson=india_district_geo, locations=geojson_districts_df["DISTRICT"], z=pd.Series([0] * len(geojson_districts_df)),
             featureidkey="properties.DISTRICT_UPPER", colorscale=[[0, 'rgb(240,240,240)'], [1, 'rgb(240,240,240)']],
@@ -1996,31 +1950,26 @@ def update_district_map_detailed(selected_category, year_range, selected_crime):
         fig.update_layout(title=f"Error: Column '{crime_col}' missing", title_x=0.5, paper_bgcolor="#ffffff", plot_bgcolor="#ffffff", margin={"r":10, "t":40, "l":10, "b":10}, geo=dict(bgcolor= 'rgba(0,0,0,0)'))
         return fig
 
-    # Aggregate data by district for the selected crime column and years
+    
     district_summary = df_filtered.groupby("DISTRICT")[crime_col].sum().reset_index()
 
     # --- Merge with GeoJSON districts ---
-    # Perform a left merge: keep all districts from geojson_districts_df
-    # Use the 'DISTRICT' column name assumed to be consistent after cleaning/fuzzy matching
     merged_data = pd.merge(geojson_districts_df, district_summary, on='DISTRICT', how='left')
 
-    # Fill NaN values in the crime column with 0 for districts present in GeoJSON but not in data
-    merged_data[crime_col] = merged_data[crime_col].fillna(0).astype(int) # Ensure integer type
+    merged_data[crime_col] = merged_data[crime_col].fillna(0).astype(int) 
 
     # --- Create Map using merged_data ---
     if merged_data.empty:
-         # This case is unlikely if geojson_districts_df is populated
          return go.Figure().update_layout(title="Error creating merged map data.", title_x=0.5, xaxis_visible=False, yaxis_visible=False)
 
-    # Dynamic Z range based on merged data (excluding potential massive outliers if needed)
-    # Use quantiles on the non-zero values if there are many zeros, otherwise use max
+    # Dynamic Z range based on merged data
     non_zero_values = merged_data[merged_data[crime_col] > 0][crime_col]
     if not non_zero_values.empty:
         max_z = non_zero_values.quantile(0.98) if len(non_zero_values) > 10 else non_zero_values.max()
         min_z = 0 # Always start from 0
-        if max_z == 0: max_z = 1 # Avoid max_z being 0 if only zeros exist after filtering
+        if max_z == 0: max_z = 1 
     else:
-        min_z, max_z = 0, 1 # Default range if all values are 0
+        min_z, max_z = 0, 1 
 
     crime_label_disp = crime_col.replace("_", " ").title()
     map_title = f"{crime_label_disp} ({selected_category.upper()}) by District ({min_year}–{max_year})"
@@ -2028,26 +1977,26 @@ def update_district_map_detailed(selected_category, year_range, selected_crime):
 
     fig = go.Figure(go.Choropleth(
         geojson=india_district_geo,
-        locations=merged_data["DISTRICT"], # Use the DISTRICT column from merged data
-        z=merged_data[crime_col],          # Use the crime column (with zeros filled)
-        featureidkey="properties.DISTRICT_UPPER", # Key in GeoJSON properties
-        colorscale="Viridis",              # Or choose another scale like "Blues" or "Reds"
-        reversescale=False,                # Adjust as needed
+        locations=merged_data["DISTRICT"], 
+        z=merged_data[crime_col],          
+        featureidkey="properties.DISTRICT_UPPER", 
+        colorscale="Viridis",              
+        reversescale=False,                
         marker_line_color="#d4d4d4",
         marker_line_width=0.2,
         zmin=min_z,
         zmax=max_z,
         zauto=False,
         colorbar_title=colorbar_title_text,
-        customdata=merged_data[["DISTRICT", crime_col]], # Pass district and value
+        customdata=merged_data[["DISTRICT", crime_col]], 
         hovertemplate = '<b>District:</b> %{customdata[0]}<br>' +
-                        f'<b>{crime_label_disp}:</b> %{{customdata[1]:,}}<br>' + # Use customdata for value
+                        f'<b>{crime_label_disp}:</b> %{{customdata[1]:,}}<br>' + 
                         '<extra></extra>'
     ))
 
     fig.update_geos(
         visible=False, scope="asia", projection_type="mercator",
-        lataxis_range=[5, 38], lonaxis_range=[67, 99], # Adjust ranges if needed
+        lataxis_range=[5, 38], lonaxis_range=[67, 99], 
         bgcolor='rgba(0,0,0,0)', fitbounds="locations"
     )
 
@@ -2061,8 +2010,7 @@ def update_district_map_detailed(selected_category, year_range, selected_crime):
     return fig
 
 
-# Callback to handle district selection from the map click (Populates details section trigger)
-# (Keep this callback as it was - it just stores the clicked district)
+# Callback to handle district selection from the map click 
 @app.callback(
     [Output("selected-district-store", "data"),
      Output("selected-district-display", "children")],

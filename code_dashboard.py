@@ -1201,7 +1201,7 @@ app.layout = html.Div([
             html.Span("Created by: ", style={'marginRight': '5px'}),
             html.A("Roshan Kumar", href="https://www.linkedin.com/in/roshan03/", target="_blank", className='footer-link'),
             html.Span(" | ", style={'margin': '0 5px'}), # Optional label
-            html.A("Akshay Toshniwal", href="linkedin.com/in/akshay-toshniwal-a3aa77206", target="_blank", className='footer-link'),
+            html.A("Akshay Toshniwal", href="https://www.linkedin.com/in/akshay-toshniwal-a3aa77206", target="_blank", className='footer-link'),
             html.Span(" | ", style={'margin': '0 5px'}), # Separator
             html.A("Ansh Makwe", href="https://www.linkedin.com/in/ansh-makwe-1908bb227/", target="_blank", className='footer-link'),
             html.Span(" | ", style={'margin': '0 5px'}), # Separator
@@ -2512,20 +2512,19 @@ def update_relative_treemap(top_n):
         Output('cluster-map', 'figure'),
         Output('cluster-centroid-bar', 'figure'),
         Output('cluster-centroid-silhouette', 'figure'),
-        Output('cluster-trends-total', 'figure'), # Updated ID
-        Output('cluster-trends-avg', 'figure'),   # New Output for avg trend
-        Output('cluster-visibility-checklist', 'options'), # Update checklist options
-        Output('cluster-visibility-checklist', 'value')    # Update checklist values
+        Output('cluster-trends-total', 'figure'), 
+        Output('cluster-trends-avg', 'figure'),   
+        Output('cluster-visibility-checklist', 'options'), 
+        Output('cluster-visibility-checklist', 'value')    
     ],
     [
         Input('cluster-features', 'value'),
         Input('cluster-count', 'value'),
-        Input('cluster-visibility-checklist', 'value'), # Add checklist value as input
+        Input('cluster-visibility-checklist', 'value'), 
     ],
-    # *** CORRECTED ***: Removed State for checklist value as it's an Input
     prevent_initial_call=True
 )
-def update_clusters(selected_feats, n_clusters, visible_clusters): # visible_clusters is now directly from Input
+def update_clusters(selected_feats, n_clusters, visible_clusters): # visible_clusters are directly from Input
     """
     Updates all cluster-related plots based on selected crime features,
     the number of clusters, and selected visible clusters for the map.
@@ -2593,11 +2592,8 @@ def update_clusters(selected_feats, n_clusters, visible_clusters): # visible_clu
         df_clust[f] = pd.to_numeric(df_clust[f], errors='coerce')
 
     X_agg = df_clust.groupby('DISTRICT')[valid_feats].mean().fillna(0)
-
-    # Remove districts with zero variance across selected features
     X_agg = X_agg.loc[X_agg.var(axis=1) > 1e-6]
 
-    # Check for sufficient data points
     if X_agg.empty or len(X_agg) < n_clusters:
         err_msg = 'Not enough valid district data for clustering.'
         return error_fig(err_msg), error_fig(''), error_fig(''), error_fig(''), error_fig(''), default_checklist_opts, default_checklist_vals
@@ -2609,10 +2605,9 @@ def update_clusters(selected_feats, n_clusters, visible_clusters): # visible_clu
 
     # --- K-Means Clustering ---
     try:
-        # Use init='k-means++' and n_init=10 (or 'auto' in newer sklearn)
         km = KMeans(n_clusters=n_clusters, init='k-means++', random_state=42, n_init=10).fit(X_scaled_df)
-        labels = dict(zip(X_scaled_df.index, km.labels_))  # District to cluster mapping
-        cluster_labels = km.labels_  # Cluster assignments for silhouette
+        labels = dict(zip(X_scaled_df.index, km.labels_)) 
+        cluster_labels = km.labels_  
     except Exception as e:
         print(f"Error during KMeans: {e}")
         err_msg = f'Error during clustering: {e}'
@@ -2622,15 +2617,10 @@ def update_clusters(selected_feats, n_clusters, visible_clusters): # visible_clu
     unique_clusters_found = sorted(list(np.unique(cluster_labels)))
     checklist_opts = [{'label': f'Cluster {i}', 'value': i} for i in unique_clusters_found]
 
-    # *** CORRECTED ***: Use the 'visible_clusters' argument directly
-    # If only the checklist triggered, keep the current selection. Otherwise, reset.
     if triggered_id != 'cluster-visibility-checklist' or not visible_clusters:
-         # Reset to all if K changed, features changed, or checklist was empty
          checklist_vals = unique_clusters_found
     else:
-         # Keep the user's selection from the Input, filtering for valid clusters
          checklist_vals = [val for val in visible_clusters if val in unique_clusters_found]
-         # If the previous selection is now empty (e.g., K decreased drastically), select all
          if not checklist_vals and unique_clusters_found:
              checklist_vals = unique_clusters_found
 
@@ -2639,19 +2629,13 @@ def update_clusters(selected_feats, n_clusters, visible_clusters): # visible_clu
 
     # 1. Choropleth Map (Always update map)
     map_fig = create_choropleth_map(X_agg, labels, valid_feats, n_clusters, checklist_vals)
-
-    # 2. Centroid Bar Chart
-    # 3. Silhouette Plot
-    # 4. Trend Plots (Total and Average)
-
-    # Use no_update if only the checklist changed
     if triggered_id == 'cluster-visibility-checklist':
         bar_fig = no_update
         sil_fig = no_update
         trend_fig_total = no_update
         trend_fig_avg = no_update
     else:
-        # Regenerate plots if features or K changed
+        # Update plots if features or K changed
         try:
             centroids_original_scale = scaler.inverse_transform(km.cluster_centers_)
             bar_fig = create_centroid_bar_chart(centroids_original_scale, valid_feats, n_clusters)
@@ -2660,15 +2644,13 @@ def update_clusters(selected_feats, n_clusters, visible_clusters): # visible_clu
             bar_fig = error_fig('Error generating centroid plot')
 
         sil_fig = create_silhouette_plot(X_scaled_df, cluster_labels, n_clusters)
-
-        # Pass the *original* dataframe (with TOTAL districts filtered out) for trends
         trend_fig_total = create_trend_forecast_plot(df_clust, labels, n_clusters, crime_col='TOTAL_CRIMES', title_suffix='(Total IPC)')
         trend_fig_avg = create_trend_forecast_plot(df_clust, labels, n_clusters, crime_col=valid_feats, title_suffix='(Avg Selected)')
 
     return map_fig, bar_fig, sil_fig, trend_fig_total, trend_fig_avg, checklist_opts, checklist_vals
 
 
-# --- Helper Functions for Plot Creation (with modifications) ---
+# --- Helper Functions for Plot Creation ---
 
 def create_choropleth_map(X_agg, labels, valid_feats, n_clusters, visible_clusters):
     """
@@ -2902,7 +2884,7 @@ def create_silhouette_plot(X_scaled_df, cluster_labels, n_clusters):
 
         cluster_color_map = {f'Cluster {i}': CLUSTER_COLORS[i % len(CLUSTER_COLORS)] for i in range(n_clusters)}
 
-        # *** CORRECTED ***: Added opacity=1 directly to px.bar
+        # Added opacity=1 directly to px.bar
         sil_fig = px.bar(
             sil_df,
             x='silhouette',
@@ -2919,7 +2901,7 @@ def create_silhouette_plot(X_scaled_df, cluster_labels, n_clusters):
 
         # Keep update_traces for hover and potentially other marker properties if needed
         sil_fig.update_traces(
-            marker_opacity=1, # Reinforce opacity setting
+            marker_opacity=1,
             selected_marker_opacity=1,
             unselected_marker_opacity=1,
             hovertemplate=(
@@ -3175,13 +3157,13 @@ def update_juv_plots(selected_categories):
 
         fig.update_layout(
             title=f"Juvenile Arrests {subtitle}",
-            title_x=0.5,  # Center the title
-            height=700,  # Fixed height for all charts
-            width=550,   # Fixed width for all charts
+            title_x=0.5,  
+            height=700,  
+            width=550,  
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=0,           # move legend below the chart (adjust as needed)
+                y=0,           
                 xanchor="center",
                 x=0.5,
                 font=dict(size=10)
@@ -3190,13 +3172,13 @@ def update_juv_plots(selected_categories):
             # margin=dict(t=60, b=40, l=40, r=120),
             paper_bgcolor='white',
             plot_bgcolor='white',
-            uniformtext_minsize=10,  # Minimum font size
-            uniformtext_mode='hide'  # Hide labels that are too small
+            uniformtext_minsize=10,  
+            uniformtext_mode='hide'  
         )
 
         fig.update_traces(
             hovertemplate='<b>%{label}</b><br>Count: %{value:,}<br>Percentage: %{percent:.1%}<extra></extra>',
-            textposition='outside'  # Position all text outside for clarity
+            textposition='outside'  
         )
 
         figs.append(
@@ -3210,7 +3192,7 @@ def update_juv_plots(selected_categories):
                     'display':'inline-block',
                     'verticalAlign':'top',
                     'padding':'5px',
-                    'height':'600px'  # Fixed container height
+                    'height':'600px'  # container height
                 }
             )
         )
@@ -3221,7 +3203,7 @@ def update_juv_plots(selected_categories):
 ## Custodial Deaths 
 
 
-# 5. Callback to disable options once 6 states are chosen
+# Callback to disable options once 6 states are chosen
 @app.callback(
     Output('state-select', 'options'),
     Input('state-select', 'value')
@@ -3234,7 +3216,7 @@ def disable_extra_states(selected_states):
                 o['disabled'] = True
     return opts
 
-# 6. Callback to update chart based on controls
+# Callback to update chart based on controls
 @app.callback(
     Output('timeline-graph', 'figure'),
     Input('chart-type',    'value'),
@@ -3456,27 +3438,24 @@ def update_test(states_sel, subs_sel, yr_range):
     return fig
 
 # ---------------------------------------------------
-# Callbacks for Kidnappings & Abductions Tab (NEW)
+# Callbacks for Kidnappings & Abductions Tab 
 # ---------------------------------------------------
 
 # Callback to populate the Purpose dropdown
 @app.callback(
     Output("kidnap-purpose-dropdown", "options"),
-    Input("main-tabs", "value") # Trigger when the tab becomes active or on load
+    Input("main-tabs", "value") # Triggers when the tab becomes active or on load
 )
 def update_kidnap_purpose_options(tab_value):
     # This callback runs to populate options.
     # It might run multiple times, but the logic remains the same.
     if df_kidnap.empty:
         return [{'label': 'Data Not Loaded', 'value': 'error'}]
-
-    # Get unique original purpose names and their cleaned versions
     purposes = df_kidnap[['PURPOSE', 'PURPOSE_CLEAN']].drop_duplicates().sort_values('PURPOSE')
     
     # --- Filter out the specific 'Total' purpose ---
     total_purpose_label = 'Total (Sum of 1-13 Above)'
     purposes_filtered = purposes[purposes['PURPOSE_CLEAN'] != total_purpose_label]
-    # ---------------------------------------------
 
     options = [{'label': 'TOTAL KIDNAPPINGS', 'value': 'TOTAL_KIDNAPPINGS'}]
     options.extend([
@@ -3492,15 +3471,13 @@ def update_kidnap_purpose_options(tab_value):
      Input("kidnap-purpose-dropdown", "value"),
      Input("kidnap-viz-type-radio", "value"),
      Input("kidnap-state-multiselect", "value"),
-     Input("kidnap-state-demographics-dropdown", "value")] # <-- ADDED DEMOGRAPHICS STATE DROPDOWN
+     Input("kidnap-state-demographics-dropdown", "value")] 
 )
 def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selected_states, selected_demo_state):
     """Update visualizations in the Kidnapping tab based on selections."""
     
     if df_kidnap.empty:
         return html.Div("Kidnapping data could not be loaded.", style={'color': 'red', 'textAlign':'center', 'padding':'20px'})
-
-        # Input validation differs slightly depending on viz_type
     if viz_type == "trend":
         if not year_range or not selected_purpose:
             return html.Div("Please select year range and purpose for Trend Analysis.",
@@ -3510,7 +3487,7 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
             return html.Div("Please select year range and purpose for State Comparison.",
                            style={'padding': '20px', 'color': '#777777', 'fontStyle': 'italic', 'textAlign':'center'})
     elif viz_type == "profile_comparison":
-        # Profile comparison needs states selected, but not necessarily a specific purpose (though it uses all purposes implicitly)
+        # Profile comparison needs states selected, but not necessarily a specific purpose
         if not year_range or not selected_states:
              return html.Div("Please select year range and at least one state for Profile Comparison.",
                            style={'padding': '20px', 'color': '#777777', 'fontStyle': 'italic', 'textAlign':'center'})
@@ -3522,11 +3499,11 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
     elif not viz_type: # Handle case where viz_type might be None initially or unexpectedly
         return html.Div("Please select a visualization type.",
                         style={'padding': '20px', 'color': '#777777', 'fontStyle': 'italic', 'textAlign':'center'})
-    else: # Fallback for truly unexpected viz_type values
-        print(f"ERROR: Unexpected viz_type received: {viz_type}") # Log unexpected value
+    else: 
+        print(f"ERROR: Unexpected viz_type received: {viz_type}") 
         return html.Div(f"Invalid visualization type selected: {viz_type}", style={'color': 'red', 'textAlign':'center'})
 
-    # --- Common Filtering by Year (moved after validation) ---
+    # --- Common Filtering by Year ---
     min_year, max_year = year_range
     df_filtered_years = df_kidnap[(df_kidnap["YEAR"] >= min_year) & (df_kidnap["YEAR"] <= max_year)].copy()
 
@@ -3544,7 +3521,7 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
 
     # === Trend Analysis ===
     if viz_type == "trend":
-        # --- Data Aggregation based on Purpose --- (Same as before)
+        # --- Data Aggregation based on Purpose --- 
         if selected_purpose == 'TOTAL_KIDNAPPINGS':
             df_agg = df_filtered_years.groupby(['STATE', 'YEAR'])['COUNT'].sum().reset_index()
             target_col = 'COUNT'
@@ -3565,7 +3542,6 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
         if trend_df.empty or trend_df[target_col].sum() == 0:
              graphs.append(html.Div(f"No trend data to display for {purpose_label} ({year_label_str}).", style={**card_style, 'fontStyle':'italic', 'color':'grey'}))
         else:
-            # Ensure YEAR is numeric before plotting
             trend_df['YEAR'] = pd.to_numeric(trend_df['YEAR'])
 
             # --- Create figure using graph_objects ---
@@ -3575,10 +3551,10 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
             line_fig.add_trace(go.Scatter(
                 x=trend_df['YEAR'],
                 y=trend_df[target_col],
-                mode='lines+markers',  # Specify mode directly here
+                mode='lines+markers',  
                 line=dict(color='#1f77b4', width=3),
-                marker=dict(size=8, color='#1f77b4'), # Apply marker style directly
-                name=purpose_label, # Optional: for legend if ever needed
+                marker=dict(size=8, color='#1f77b4'), 
+                name=purpose_label, #for legend if ever needed
                 hovertemplate='Year: %{x}<br>Cases: %{y:,}<extra></extra>'
             ))
 
@@ -3588,17 +3564,17 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
                 plot_bgcolor='#ffffff',
                 paper_bgcolor='#ffffff',
                 font={'color': '#333333'},
-                title_font=dict(size=18, color='#1f77b4'), # Use explicit title font dict
+                title_font=dict(size=18, color='#1f77b4'), 
                 title_x=0.5,
                 title_xanchor='center',
                 margin={'l': 40, 'r': 40, 't': 60, 'b': 40},
                 xaxis=dict(gridcolor='#f0f0f0', title='Year', dtick=1),
                 yaxis=dict(gridcolor='#f0f0f0', title='Number of Cases'),
-                showlegend=False # Hide legend if only one trace
+                showlegend=False 
             )
             graphs.append(html.Div(dcc.Graph(figure=line_fig), className="card-container", style=card_style))
 
-            # --- YOY Bar Chart --- (Same as before)
+            # --- YOY Bar Chart --- 
             if len(trend_df) > 1:
                 trend_df['YOY_CHANGE'] = trend_df[target_col].pct_change() * 100
                 trend_df['YOY_CHANGE'] = trend_df['YOY_CHANGE'].replace([float('inf'), -float('inf')], None)
@@ -3625,7 +3601,7 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
 
     # === State Comparison (Counts) ===
     elif viz_type == "state_comparison":
-        # --- Data Aggregation based on Purpose --- (Same as before)
+        # --- Data Aggregation based on Purpose --- 
         if selected_purpose == 'TOTAL_KIDNAPPINGS':
             df_agg = df_filtered_years.groupby(['STATE', 'YEAR'])['COUNT'].sum().reset_index()
             target_col = 'COUNT'
@@ -3646,7 +3622,7 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
         if state_agg_k.empty:
              graphs.append(html.Div(f"No states reported cases for {purpose_label} between {year_label_str}.", style={**card_style, 'fontStyle':'italic', 'color':'grey'}))
         else:
-            # --- Top States Bar Chart --- (Same as before)
+            # --- Top States Bar Chart --- 
             top_states_k = state_agg_k.sort_values(target_col, ascending=False).head(15)
             state_fig_k = px.bar(top_states_k, y="STATE", x=target_col, orientation='h',
                             title=f"Top 15 States by {purpose_label} Cases ({year_label_str})")
@@ -3660,7 +3636,7 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
             state_fig_k.update_traces(marker_color='#1f77b4', hovertemplate='State: %{y}<br>Cases: %{x:,}<extra></extra>')
             graphs.append(html.Div(dcc.Graph(figure=state_fig_k), className="card-container", style=card_style))
 
-            # --- Top 5 States Pie Chart --- (Same as before)
+            # --- Top 5 States Pie Chart --- 
             top5_states_k_df = state_agg_k.sort_values(target_col, ascending=False).head(5)
             total_top5_k = top5_states_k_df[target_col].sum()
             total_all_k = state_agg_k[target_col].sum()
@@ -3689,46 +3665,36 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
         # Filter by selected states *in addition* to years
         df_filtered = df_filtered_years[df_filtered_years['STATE'].isin(selected_states)].copy()
 
-        # --- IMPORTANT: Exclude the 'Total' purpose row BEFORE calculating percentages ---
-        total_purpose_label = 'Total (Sum of 1-13 Above)' # Define the exact label to filter out
+        # --- Exclude the 'Total' purpose row BEFORE calculating percentages ---
+        total_purpose_label = 'Total (Sum of 1-13 Above)' 
         df_filtered = df_filtered[df_filtered['PURPOSE_CLEAN'] != total_purpose_label]
         # -----------------------------------------------------------------------------
 
-        # --- Robustness Check: Ensure COUNT is numeric ---
+        # --- Ensure COUNT is numeric ---
         df_filtered['COUNT'] = pd.to_numeric(df_filtered['COUNT'], errors='coerce').fillna(0).astype(int)
 
-        if df_filtered.empty or df_filtered['COUNT'].sum() == 0: # Check if any actual cases exist
+        if df_filtered.empty or df_filtered['COUNT'].sum() == 0: 
             graphs.append(html.Div(f"No non-'Total' kidnapping cases found for the selected states/years.", style={**card_style, 'fontStyle':'italic', 'color':'grey'}))
         else:
-            # Aggregate count per state and purpose (only for non-zero counts initially)
             purpose_agg = df_filtered[df_filtered['COUNT'] > 0].groupby(['STATE', 'PURPOSE_CLEAN'])['COUNT'].sum().reset_index()
-
-            # Calculate total count per state (using the filtered data *before* purpose aggregation)
             state_totals = df_filtered.groupby('STATE')['COUNT'].sum().reset_index().rename(columns={'COUNT':'STATE_TOTAL'})
-            # Keep only states with a positive total count
             state_totals = state_totals[state_totals['STATE_TOTAL'] > 0]
-
-            # Merge totals back with purpose aggregates. Use left merge to keep all purposes for states that HAVE totals.
             purpose_agg = pd.merge(state_totals, purpose_agg, on='STATE', how='left')
-            # Fill NaN counts/purposes resulting from the merge (states with totals but 0 for specific purpose)
             purpose_agg['COUNT'] = purpose_agg['COUNT'].fillna(0).astype(int)
-            purpose_agg['PURPOSE_CLEAN'] = purpose_agg['PURPOSE_CLEAN'].fillna('Unknown/None') # Or handle differently if needed
+            purpose_agg['PURPOSE_CLEAN'] = purpose_agg['PURPOSE_CLEAN'].fillna('Unknown/None') 
             # Calculate percentage
             purpose_agg['PERCENTAGE'] = (purpose_agg['COUNT'] / purpose_agg['STATE_TOTAL']) * 100
             purpose_agg = purpose_agg.sort_values(by=['STATE_TOTAL','STATE', 'PURPOSE_CLEAN'], ascending=[False, True, True]) # Sort states by total count desc
-
-            # Get unique purposes and ordered states based on the processed data
             unique_purposes = sorted(purpose_agg['PURPOSE_CLEAN'].unique())
             ordered_states = purpose_agg['STATE'].unique().tolist() # Now ordered by total cases
 
             # --- Add Total Cases Display ---
-            # Use the state_totals dataframe calculated earlier
             total_cases_text_lines = [f"Total Cases ({year_label_str}) for Selected States:"]
             total_cases_text_lines.extend([f"- {row['STATE']}: {row['STATE_TOTAL']:,}" for index, row in state_totals.iterrows() if row['STATE'] in ordered_states]) # Filter totals for included states
             total_cases_display = html.Div([
                  html.H5(total_cases_text_lines[0], style={'color': '#1f77b4', 'marginBottom':'5px'}),
                  html.Ul([html.Li(line) for line in total_cases_text_lines[1:]], style={'listStyleType':'none', 'paddingLeft':'10px', 'fontSize':'0.9em'})
-            ], style={**card_style, 'marginTop': '-10px'}) # Style as a card, adjust margin
+            ], style={**card_style, 'marginTop': '-10px'}) 
 
             graphs.append(total_cases_display)
 
@@ -3737,14 +3703,11 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
             try:
                 # Pivot the percentage data
                 purpose_pivot_perc = purpose_agg.pivot_table(index='STATE', columns='PURPOSE_CLEAN', values='PERCENTAGE', fill_value=0)
-                # Pivot the count data (for customdata)
                 purpose_pivot_count = purpose_agg.pivot_table(index='STATE', columns='PURPOSE_CLEAN', values='COUNT', fill_value=0)
-
-                # Ensure row order matches the bar chart
                 purpose_pivot_perc = purpose_pivot_perc.reindex(ordered_states)
                 purpose_pivot_count = purpose_pivot_count.reindex(ordered_states)
 
-                # Ensure column order is consistent (alphabetical)
+                # Ensure column order is consistent 
                 purpose_pivot_perc = purpose_pivot_perc[sorted(purpose_pivot_perc.columns)]
                 purpose_pivot_count = purpose_pivot_count[sorted(purpose_pivot_count.columns)]
 
@@ -3773,8 +3736,6 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
                 print(f"Error creating heatmap: {e}")
                 graphs.append(html.Div(f"Could not generate heatmap. Error: {e}", style={**card_style, 'color':'red'}))
 
-        # ... (existing code for trend, state_comparison, profile_comparison) ...
-
     # === Victim Demographics Breakdown ===
     elif viz_type == "victim_demographics":
         # Input Validation for this specific viz
@@ -3785,11 +3746,9 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
         # Start with year-filtered data
         df_demographics = df_filtered_years.copy()
 
-        # Filter by Purpose (handle TOTAL case by aggregating demographics)
+        # Filter by Purpose
         if selected_purpose == 'TOTAL_KIDNAPPINGS':
             purpose_label_demo = "Total Kidnappings"
-            # We need to sum the demographic columns *before* grouping by state/year if needed later
-            # Let's do the state/all india filtering first
         else:
             # Get the clean purpose label
             purpose_label_demo = df_demographics[df_demographics['PURPOSE'] == selected_purpose]['PURPOSE_CLEAN'].iloc[0] if selected_purpose in df_demographics['PURPOSE'].values else selected_purpose
@@ -3819,7 +3778,7 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
             'K_A_MALE_UPTO_10_YEARS', 'K_A_MALE_10_18_YEARS', 'K_A_MALE_18_30_YEARS',
             'K_A_MALE_30_50_YEARS', 'K_A_MALE_ABOVE_50_YEARS'
         ]
-        # Check if columns exist (should be guaranteed by standardize_columns)
+        # Check if columns exist 
         valid_demo_cols = [col for col in demo_cols if col in df_demographics.columns]
         if not valid_demo_cols:
              return html.Div("Required demographic columns not found in the data.", style={**card_style, 'color':'red'})
@@ -3830,15 +3789,13 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
         # --- Prepare Data for Plotting ---
         demo_df = demographic_counts.reset_index()
         demo_df.columns = ['Demographic_Group_Raw', 'COUNT']
-        demo_df = demo_df[demo_df['COUNT'] > 0] # Only plot non-zero groups
+        demo_df = demo_df[demo_df['COUNT'] > 0] 
 
         if demo_df.empty:
             graphs.append(html.Div(f"No victims recorded in specific demographic groups for '{purpose_label_demo}' in '{location_label}' ({year_label_str}).", style={**card_style, 'fontStyle':'italic', 'color':'grey'}))
         else:
-            # Clean up labels for display
             def clean_demo_label(raw_label):
                 label = raw_label.replace('K_A_', '').replace('_YEARS', '').replace('_', ' ')
-                # Simple replacements - could be more sophisticated
                 label = label.replace('FEMALE UPTO 10', 'Female 0-10')
                 label = label.replace('FEMALE 10 18', 'Female 10-18')
                 label = label.replace('FEMALE 18 30', 'Female 18-30')
@@ -3852,7 +3809,7 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
                 return label.strip()
 
             demo_df['Demographic_Group'] = demo_df['Demographic_Group_Raw'].apply(clean_demo_label)
-            # Sort for better visualization (optional)
+            # Sort for better visualization
             demo_df = demo_df.sort_values('COUNT', ascending=False)
 
             # --- Create Grouped Bar Chart ---
@@ -3860,7 +3817,7 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
                 demo_df,
                 x='Demographic_Group',
                 y='COUNT',
-                color='Demographic_Group', # Color by group for distinction
+                color='Demographic_Group',
                 title=f"Victim Demographics for '{purpose_label_demo}'<br>in {location_label} ({year_label_str})",
                 labels={'COUNT': 'Number of Cases', 'Demographic_Group': 'Victim Age & Gender Group'}
             )
@@ -3871,7 +3828,7 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
                 margin={'l': 40, 'r': 40, 't': 80, 'b': 40}, # Increased top margin for longer title
                 xaxis={'gridcolor': '#f0f0f0', 'title': 'Demographic Group', 'categoryorder': 'total descending'}, # Order bars by count
                 yaxis={'gridcolor': '#f0f0f0', 'title': 'Number of Cases'},
-                showlegend=False # Legend is redundant with colored bars and x-axis labels
+                showlegend=False 
             )
             demo_fig.update_traces(
                 hovertemplate='<b>Group:</b> %{x}<br><b>Cases:</b> %{y:,}<extra></extra>'
@@ -3885,5 +3842,4 @@ def update_kidnap_visualizations(year_range, selected_purpose, viz_type, selecte
 
 
 if __name__ == '__main__':
-    # Set host='0.0.0.0' to make it accessible on your network if needed
-    app.run(debug=True) # debug=True enables hot reloading and error pages
+    app.run(debug=False)

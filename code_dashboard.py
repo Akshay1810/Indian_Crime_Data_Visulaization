@@ -552,8 +552,8 @@ def normalize_geojson(file_path, prop_key, new_key):
     return geo
 
 
-india_state_geo = normalize_geojson("india_state.geojson", prop_key="NAME_1", new_key="STATE_UPPER")
-india_district_geo = normalize_geojson("india_district.geojson", prop_key="NAME_2", new_key="DISTRICT_UPPER")
+india_state_geo = normalize_geojson("final_data/india_state.geojson", prop_key="NAME_1", new_key="STATE_UPPER")
+india_district_geo = normalize_geojson("final_data/india_district.geojson", prop_key="NAME_2", new_key="DISTRICT_UPPER")
 
 
 # -------------------------

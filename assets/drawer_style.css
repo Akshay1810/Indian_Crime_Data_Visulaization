@@ -1,0 +1,333 @@
+/* assets/drawer_styles.css or inside html.Style */
+
+body {
+    margin: 0;
+    font-family: 'Open Sans', sans-serif;
+    background-color: #f9f9f9;
+    color: #333333;
+    padding: 0;
+}
+
+h1,
+h2,
+h3,
+h4 {
+    font-weight: 300;
+    color: #1f77b4;
+}
+
+.card-container {
+    transition: all 0.3s cubic-bezier(.25, .8, .25, 1);
+}
+
+.card-container:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.12);
+}
+
+.dash-dropdown .Select-control:hover {
+    border-color: #1f77b4;
+}
+
+.dash-graph {
+    transition: opacity 0.3s ease;
+}
+
+/* RangeSlider specific styling */
+.rc-slider-handle {
+    border-color: #1f77b4;
+    background-color: #1f77b4;
+}
+
+.rc-slider-track {
+    background-color: #1f77b4;
+}
+
+.rc-slider-dot-active {
+    border-color: #1f77b4;
+}
+
+.rc-slider-rail {
+    background-color: #e0e0e0;
+}
+
+/* --- Header --- */
+.header-container {
+    display: flex;
+    align-items: center;
+    background-color: #3787d6;
+    color: white;
+    padding: 10px 20px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    /* height: 70px; */
+    z-index: 1001;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-sizing: border-box;
+}
+
+.hamburger-button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 5px 10px;
+    margin-right: 15px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    width: 40px;
+    height: 25px;
+}
+
+.hamburger-button .bar1,
+.hamburger-button .bar2,
+.hamburger-button .bar3 {
+    display: block;
+    width: 100%;
+    height: 3px;
+    background-color: white;
+    border-radius: 2px;
+    transition: all 0.3s ease-in-out;
+}
+
+.main-title {
+    margin: 0;
+    font-size: 1.5em;
+    flex-grow: 1;
+    text-align: center;
+    padding-right: 50px;
+    /* Adjust to center considering button */
+}
+
+
+/* --- Drawer --- */
+.drawer {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    /* Start hidden */
+    width: 280px;
+    height: 100vh;
+    background-color: #ffffff;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
+    z-index: 1002;
+    transition: left 0.3s ease-in-out;
+    overflow-y: auto;
+    padding-top: 60px;
+    /* Space for fixed header */
+    box-sizing: border-box;
+}
+
+.drawer.open {
+    left: 0;
+    /* Slide in */
+}
+
+.drawer-header {
+    padding: 15px 20px;
+    margin: 0;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 1.2em;
+    color: #333;
+}
+
+.close-button {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 28px;
+    font-weight: bold;
+    color: #888;
+    cursor: pointer;
+    padding: 0 5px;
+    line-height: 1;
+}
+
+.close-button:hover {
+    color: #333;
+}
+
+.drawer-links-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.drawer-links-list li {
+    margin: 0;
+}
+
+.drawer-link {
+    display: block;
+    padding: 12px 20px;
+    color: #333;
+    text-decoration: none;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    font-size: 0.95em;
+}
+
+.drawer-link:hover {
+    background-color: #f8f9fa;
+    color: #007bff;
+}
+
+.drawer-link.active {
+    background-color: #007bff;
+    color: white;
+    font-weight: bold;
+}
+
+/* --- Overlay --- */
+.drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+}
+
+.drawer-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* --- Main Content Wrapper (adjust based on your outer div) --- */
+/* The div wrapping dcc.Tabs in your original layout has specific styling */
+/* We need to add padding-top to account for the fixed header */
+#main-content-wrapper {
+    /* Added an example ID - apply to the div wrapping dcc.Tabs */
+    padding: 80px;
+    max-width: 1300px;
+    margin: 0 auto;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    /* margin-top: 70px; */
+    padding-top: 300px;
+    /* Add margin/padding to push below fixed header */
+}
+
+
+/* --- Hide Default dcc.Tabs Bar ---
+/* Target the container div that usually holds the tab buttons/links */
+#main-tabs {
+    display: none !important;
+    /* Hide the element */
+    visibility: hidden !important;
+    /* Make it invisible */
+    height: 0 !important;
+    /* Collapse its height */
+    overflow: hidden !important;
+    /* Prevent content spillover */
+    margin-bottom: 0 !important;
+    /* Remove any space around it */
+    padding: 0 !important;
+    /* Remove internal spacing */
+    border: none !important;
+    /* Remove any borders */
+}
+
+/* #main-tabs>ul.Tabs {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+#main-tabs>.nav-tabs {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+#main-tabs button.Tab {
+    display: none !important;
+    visibility: hidden !important;
+} */
+/* Ensure the content container (usually the second div) IS displayed */
+#main-tabs>div:nth-of-type(2){
+    display: block !important;
+    /* Make sure the content area is visible */
+    border-top: none !important;
+    /* Remove any residual border */
+    padding: 20px !important;
+    /* Remove potential padding */
+}
+
+.app-footer {
+    display: flex;
+    /* Enable flexbox for alignment */
+    justify-content: space-between;
+    /* Push left/right items to edges */
+    align-items: center;
+    /* Vertically center items */
+    padding: 10px 25px;
+    /* Add padding */
+    margin-top: 30px;
+    /* Space above the footer */
+    border-top: 1px solid white;
+    background-color: #3787d6;
+    color: white;
+    font-size: 0.9em;
+    max-width: 100%;
+    /* Match content width */
+    /* margin-left: auto;
+    /* Center the footer container */
+    /* margin-right: auto; */
+    /* border-radius: 0 0 8px 8px; */
+    /* Match bottom corners of content wrapper if desired */
+    position: relative;
+    /* Needed for absolute positioning of center */
+    height: 100px;
+    /* Example fixed height */
+    box-sizing: border-box;
+    /* transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease; */
+}
+
+.footer-left {
+    /* Already aligned left by flexbox */
+    font-weight: bold;
+    font-size: large;
+    flex-shrink: 0;
+}
+
+.footer-center {
+    /* Center using absolute positioning relative to the footer */
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: large;
+    flex-shrink: 0;
+    /* Precise centering */
+}
+
+.footer-right {
+    /* Aligned right by flexbox space-between */
+    display: flex;
+    /* padding-top: 5%; */
+    /* Use flex for items inside the right section too */
+    /* align-items: center; */
+    flex-shrink: 0;
+    /* Prevent shrinking */
+}
+
+.footer-link {
+    color: var(--footer-link-color);
+    text-decoration: none;
+    /* Remove underline */
+    transition: color 0.2s ease;
+}
+
+.footer-link:hover {
+    color: var(--footer-link-hover-color);
+    text-decoration: underline;
+    /* Add underline on hover */
+}

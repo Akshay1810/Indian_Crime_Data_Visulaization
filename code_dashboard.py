@@ -323,66 +323,6 @@ comparison_cols = ['Victims', 'By Registered Arms', 'By Unregistered Arms']
 df_aggregated = pd.DataFrame(columns=[area_col] + comparison_cols)
 areas = []
 
-
-def load_and_clean_kidnapping_purpose_csv(file_path):
-    try:
-        # Read CSV, explicitly handle 'NULL' as NaN
-        df = pd.read_csv(file_path, na_values=['NULL', 'Null', 'null', ''])
-        print(f"Initial columns in kidnapping CSV: {df.columns.tolist()}") 
-
-        # Standardize columns
-        df = standardize_columns(df)
-        print(f"Standardized columns in kidnapping CSV: {df.columns.tolist()}") 
-
-        # Rename key columns for clarity and consistency
-        rename_map = {
-            'AREA_NAME': 'STATE',
-            'YEAR': 'YEAR',
-            'SUB_GROUP_NAME': 'PURPOSE',
-            'K_A_GRAND_TOTAL': 'COUNT' 
-        }
-        
-        valid_rename_map = {k: v for k, v in rename_map.items() if k in df.columns}
-        df = df.rename(columns=valid_rename_map)
-        print(f"Renamed columns in kidnapping CSV: {df.columns.tolist()}") 
-
-        required_cols = ['STATE', 'YEAR', 'PURPOSE', 'COUNT']
-        missing_req = [col for col in required_cols if col not in df.columns]
-        if missing_req:
-            raise ValueError(f"Essential columns missing after standardization/rename: {missing_req}")
-
-        # Convert COUNT and YEAR to numeric, coercing errors
-        df['COUNT'] = pd.to_numeric(df['COUNT'], errors='coerce')
-        df['YEAR'] = pd.to_numeric(df['YEAR'], errors='coerce') # numeric for range slider
-
-        # Fill NaNs in COUNT with 0
-        df['COUNT'] = df['COUNT'].fillna(0).astype(int) 
-
-        # Drop rows where YEAR is NaN
-        df = df.dropna(subset=['YEAR'])
-        df['YEAR'] = df['YEAR'].astype(int) 
-        df['PURPOSE'] = df['PURPOSE'].fillna('').astype(str)
-        df['PURPOSE_CLEAN'] = df['PURPOSE'].str.replace(r'^\d+\.\s*', '', regex=True).str.strip()
-
-        print(f"Unique Cleaned Purposes: {df['PURPOSE_CLEAN'].unique()}")
-        # Filter out any potential total rows if they exist
-        df = df[~df['STATE'].str.contains("TOTAL", na=False, case=False)]
-        # print(f"Kidnapping data loaded successfully. Shape: {df.shape}")
-        return df
-
-    except FileNotFoundError:
-        print(f"Error: Kidnapping CSV file not found at '{file_path}'")
-        return pd.DataFrame() # Return empty DataFrame on error
-    except ValueError as ve:
-        print(f"Data Error during kidnapping CSV processing: {ve}")
-        return pd.DataFrame()
-    except Exception as e:
-        print(f"An unexpected error occurred loading/cleaning kidnapping CSV: {e}")
-        # traceback.print_exc() # Uncomment for more detailed traceback during debugging
-        return pd.DataFrame()
-
-df_kidnap = load_and_clean_kidnapping_purpose_csv('final_data/39_Specific_purpose_of_kidnapping_and_abduction.csv')
-
 def standardize_columns1(df):
     """
     Standardizes column names (uppercase, replaces spaces with underscores)
@@ -492,6 +432,7 @@ def load_and_clean_kidnapping_purpose_csv(file_path):
         print(f"An unexpected error occurred loading/cleaning kidnapping CSV: {e}")
         return pd.DataFrame()
 
+df_kidnap = load_and_clean_kidnapping_purpose_csv('final_data/39_Specific_purpose_of_kidnapping_and_abduction.csv')
 
 if os.path.exists(csv_file_path):
     try:
@@ -2015,22 +1956,20 @@ def update_district_map_detailed(selected_category, year_range, selected_crime):
     [Output("selected-district-store", "data"),
      Output("selected-district-display", "children")],
     [Input("district-map", "clickData")],
-    [State("district-category-radio", "value")], # Need category to provide context
+    [State("district-category-radio", "value")], 
     prevent_initial_call=True
 )
 def district_map_click_handler(clickData, selected_category):
     """Handles clicks on the district map ONLY to store the selected district and update display."""
     if not clickData:
-        return no_update, no_update # Keep existing selection
+        return no_update, no_update 
 
     # Extract district name from the clicked feature's location property
-    # Check if customdata is available (it should be from the updated map callback)
     if 'customdata' in clickData['points'][0]:
-         district_val = clickData['points'][0]['customdata'][0] # Get district name from customdata
+         district_val = clickData['points'][0]['customdata'][0] 
     else:
-         district_val = clickData["points"][0]["location"] # Fallback to location if customdata missing
-
-    # Find the state(s) this district belongs to in the data for context
+         district_val = clickData["points"][0]["location"] 
+    
     df = dataframes.get(selected_category)
     state_info = ""
     if df is not None and 'DISTRICT' in df.columns and 'STATE' in df.columns:
@@ -2038,22 +1977,19 @@ def district_map_click_handler(clickData, selected_category):
         if len(possible_states) == 1:
             state_info = f" (State: {possible_states[0]})"
         elif len(possible_states) > 1:
-            # This might happen if district names are reused across states, show them all
             state_info = f" (States: {', '.join(possible_states)})"
 
 
     display_text = f"Selected for Details: {district_val}{state_info}"
-    # Store a dictionary with district and category for the detail callback
     selected_data = {'district': district_val, 'category': selected_category}
 
     return selected_data, display_text
 
 
 # Callback to update district-specific detail visualizations based on stored selection
-# (Keep this callback as it was)
 @app.callback(
     Output("district-detail-graphs", "children"),
-    [Input("selected-district-store", "data")], # Triggered when stored data changes
+    [Input("selected-district-store", "data")], 
     prevent_initial_call=True
 )
 def update_district_detail_visualizations(selected_data):
@@ -2075,22 +2011,19 @@ def update_district_detail_visualizations(selected_data):
         return html.Div(f"No data available for {selected_district} in the {selected_category.upper()} dataset.",
                        style={'padding': '10px', 'color': '#777777', 'fontStyle': 'italic', 'textAlign':'center'})
 
-    # Find state for context
     possible_states = df_district['STATE'].unique()
     state_info = f" (State: {possible_states[0]})" if len(possible_states) == 1 else f" (Aggregated across States: {', '.join(possible_states)})" if len(possible_states) > 1 else ""
 
     graphs = []
-    # Using the globally defined card_style
-
     # --- Visualization 1: Time Series of TOTAL CRIMES ---
     if 'TOTAL_CRIMES' in df_district.columns:
         trend_df = df_district.groupby("YEAR")["TOTAL_CRIMES"].sum().reset_index()
-        try: # Add error handling for year conversion
-            trend_df['YEAR'] = pd.to_numeric(trend_df['YEAR']) # Ensure numeric for sorting/plotting
+        try: 
+            trend_df['YEAR'] = pd.to_numeric(trend_df['YEAR']) 
             trend_df = trend_df.sort_values("YEAR")
         except ValueError:
              print(f"Warning: Could not convert YEAR to numeric for district {selected_district} trend.")
-             trend_df = pd.DataFrame() # Set to empty to skip plot
+             trend_df = pd.DataFrame() 
 
         if not trend_df.empty and trend_df["TOTAL_CRIMES"].sum() > 0:
             line_title = f"Total {selected_category.upper()} Crimes Trend in {selected_district}{state_info}"
@@ -2143,10 +2076,10 @@ def update_district_detail_visualizations(selected_data):
     return html.Div(graphs)
 
 
-# Callback for District Comparison (MODIFIED for multi-select and specific crime)
+# Callback for District Comparison 
 @app.callback(
     Output('district-comparison-graphs', 'children'),
-    [Input('compare-districts-multi', 'value')], # UPDATED: Input from multi-select dropdown
+    [Input('compare-districts-multi', 'value')],
     [State('district-category-radio', 'value'),
      State('district-year-slider', 'value'),
      State('district-crime-dropdown', 'value')], # Use the main crime dropdown value
@@ -2173,8 +2106,7 @@ def update_district_comparison(selected_districts, category, year_range, crime_t
     min_year, max_year = year_range
     years = [str(year) for year in range(min_year, max_year + 1)]
 
-    # Use the crime column selected in the main dropdown
-    crime_col = crime_type # Already defaults to TOTAL_CRIMES if nothing else selected
+    crime_col = crime_type 
     if crime_col not in df.columns:
          return html.Div(f"Error: Cannot find comparison column '{crime_col}'.", style={'color': 'red', 'textAlign':'center'})
 
@@ -2186,28 +2118,25 @@ def update_district_comparison(selected_districts, category, year_range, crime_t
 
     # Aggregate by District and Year
     comp_agg = df_comp.groupby(['DISTRICT', 'YEAR'])[crime_col].sum().reset_index()
-    try: # Add error handling for year conversion
+    try: 
         comp_agg['YEAR'] = pd.to_numeric(comp_agg['YEAR']) # Ensure numeric year
         comp_agg = comp_agg.sort_values(['DISTRICT', 'YEAR'])
     except ValueError:
         print(f"Warning: Could not convert YEAR to numeric for district comparison.")
-        # Decide how to handle - maybe return error or try to proceed without sorting?
-        # For now, let's return an error message.
         return html.Div("Error converting Year data for comparison.", style={'color': 'red', 'textAlign':'center'})
 
 
     graphs = []
     crime_label = crime_col.replace("_", " ").title()
     year_label = f"{min_year}–{max_year}"
-    # Using the globally defined card_style
 
     # --- Visualization 1: Trend Lines for all selected districts ---
-    if len(years) > 1 and not comp_agg.empty: # Only show trend if more than one year selected and data exists
+    if len(years) > 1 and not comp_agg.empty: # Only showss trend if more than one year selected and data exists
         title_districts = ", ".join(selected_districts)
         fig_trend_comp = px.line(comp_agg, x='YEAR', y=crime_col, color='DISTRICT',
                                  title=f"{crime_label} Trend: {title_districts} ({year_label})",
                                  markers=True,
-                                 color_discrete_sequence=px.colors.qualitative.Plotly) # Use a qualitative color scale
+                                 color_discrete_sequence=px.colors.qualitative.Plotly) # qualitative color scale
         fig_trend_comp.update_layout(
             plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', font={'color': '#333333'},
             title={'font': {'size': 16, 'color': '#1f77b4'}, 'x': 0.5, 'xanchor': 'center'},
@@ -2224,21 +2153,20 @@ def update_district_comparison(selected_districts, category, year_range, crime_t
 
     # --- Visualization 2: Bar Chart comparing total over the period ---
     total_comp = comp_agg.groupby('DISTRICT')[crime_col].sum().reset_index()
-    # Ensure the order matches the selection order if possible, or sort alphabetically/by value
     total_comp = total_comp.sort_values(crime_col, ascending=False) # Sort by value descending
 
     if not total_comp.empty:
         fig_bar_comp = px.bar(total_comp, x='DISTRICT', y=crime_col, color='DISTRICT',
                               title=f"Total {crime_label} Comparison ({year_label})",
                               text=crime_col,
-                              color_discrete_sequence=px.colors.qualitative.Plotly) # Match line colors
+                              color_discrete_sequence=px.colors.qualitative.Plotly) 
         fig_bar_comp.update_layout(
             plot_bgcolor='#ffffff', paper_bgcolor='#ffffff', font={'color': '#333333'},
             title={'font': {'size': 16, 'color': '#1f77b4'}, 'x': 0.5, 'xanchor': 'center'},
             margin={'l': 40, 'r': 40, 't': 50, 'b': 40},
-            xaxis={'gridcolor': '#f0f0f0', 'title': 'District', 'categoryorder':'total descending'}, # Order bars by value
+            xaxis={'gridcolor': '#f0f0f0', 'title': 'District', 'categoryorder':'total descending'}, 
             yaxis={'gridcolor': '#f0f0f0', 'title': f"Total {crime_label}"},
-            showlegend=False # Colors match bars, legend redundant
+            showlegend=False 
         )
         fig_bar_comp.update_traces(texttemplate='%{text:,}', textposition='outside',
                                   hovertemplate='<b>%{x}</b><br>Total: %{y:,}<extra></extra>')
@@ -2317,13 +2245,6 @@ def update_crime_hotspots(selected_crime, top_n, category, year_range):
 
     return html.Div(graphs)
 
-
-# -------------------------
-# Other Callbacks (Area Comparison, Place Occurrence, Murder Flow, Relatives, Clusters)
-# Keep these as they were, ensuring they use standardized column names if necessary.
-# Note: Clustering tab specifically uses IPC data (df_ipc) and its features.
-# -------------------------
-
 # --- Callback for Area Comparison Radar Plot ---
 @app.callback(
     Output('area-comparison-radar-plot', 'figure'),
@@ -2331,8 +2252,7 @@ def update_crime_hotspots(selected_crime, top_n, category, year_range):
      Input('compare-area-dropdown-2', 'value')]
 )
 def update_area_comparison_radar(selected_area1, selected_area2):
-    # Use the potentially standardized area_col and comparison_cols names
-    # (standardization happens during data loading now)
+    # Used the potentially standardized area_col and comparison_cols names
     if not selected_area1 or not selected_area2 or df_aggregated.empty or not comparison_cols:
         fig = go.Figure()
         fig.update_layout(title="Please select two areas (ensure firearm data loaded)", title_x=0.5, xaxis_visible=False, yaxis_visible=False)
@@ -2343,7 +2263,6 @@ def update_area_comparison_radar(selected_area1, selected_area2):
         fig.update_layout(title="Please select two different areas", title_x=0.5, xaxis_visible=False, yaxis_visible=False)
         return fig
 
-    # Filter aggregated data using standardized area_col
     data_area1 = df_aggregated[df_aggregated[area_col] == selected_area1]
     data_area2 = df_aggregated[df_aggregated[area_col] == selected_area2]
 
@@ -2353,12 +2272,9 @@ def update_area_comparison_radar(selected_area1, selected_area2):
         fig.update_layout(title=f"Aggregated firearm data not found for: {', '.join(missing)}", title_x=0.5, xaxis_visible=False, yaxis_visible=False)
         return fig
 
-    # Extract values using standardized comparison_cols
     values1 = data_area1[comparison_cols].iloc[0].values.tolist()
     values2 = data_area2[comparison_cols].iloc[0].values.tolist()
-
-    # Format categories from standardized column names
-    categories = [col.replace('_', ' ').replace('BY ', '').replace('VICTIMS ', '').title() for col in comparison_cols] # Cleaner labels
+    categories = [col.replace('_', ' ').replace('BY ', '').replace('VICTIMS ', '').title() for col in comparison_cols] 
 
 
     fig = go.Figure()
@@ -2367,7 +2283,7 @@ def update_area_comparison_radar(selected_area1, selected_area2):
     fig.add_trace(go.Scatterpolar(r=values2, theta=categories, fill='toself', name=selected_area2,
                                    hovertemplate=f'<b>{selected_area2}</b><br>%{{theta}}: %{{r:,}}<extra></extra>'))
 
-    title_cols_str = ', '.join(categories) # Use cleaned categories for title
+    title_cols_str = ', '.join(categories)
     fig.update_layout(
         polar=dict(radialaxis=dict(visible=True, tickformat=',')),
         title=f"Aggregated Firearm Use ({title_cols_str}):<br>{selected_area1} vs {selected_area2}",
@@ -2385,7 +2301,6 @@ def update_area_comparison_radar(selected_area1, selected_area2):
 )
 def update_place_viz(year_range):
     yrs = [str(y) for y in range(year_range[0], year_range[1]+1)]
-    # Ensure COUNT is numeric
     df_place_long['COUNT'] = pd.to_numeric(df_place_long['COUNT'], errors='coerce').fillna(0)
     dfp = df_place_long[df_place_long['YEAR'].isin(yrs)]
     dfp = dfp[dfp['COUNT'] > 0] # Filter out zero counts for cleaner viz
@@ -2399,36 +2314,32 @@ def update_place_viz(year_range):
         dfp, path=['YEAR','PLACE','CRIME'], values='COUNT',
         title='Crime by Place Occurrence (Year → Place → Crime)',
         color_discrete_sequence=px.colors.qualitative.Pastel,
-        maxdepth=2 # Limit initial depth? Or -1 for full depth
+        maxdepth=2
     )
     sb_fig.update_layout(margin=dict(t=50, l=0, r=0, b=0), title_x=0.5)
     sb_fig.update_traces(hovertemplate='<b>%{label}</b><br>Count: %{value:,}<extra></extra>')
 
 
     # Small multiples (Grouped Bar)
-    # Aggregate first to avoid overly dense plots if many years selected
+    
     dfp_agg = dfp.groupby(['PLACE', 'CRIME'])['COUNT'].sum().reset_index()
-    # Consider only top N places or crimes if needed
-    # top_places = dfp.groupby('PLACE')['COUNT'].sum().nlargest(9).index
-    # dfp_filtered = dfp[dfp['PLACE'].isin(top_places)]
 
     sm_fig = px.bar(
         dfp, # Use original dfp to show year trends within facets
         x='YEAR', y='COUNT', color='CRIME',
-        facet_col='PLACE', facet_col_wrap=3, # Max 3 columns
+        facet_col='PLACE', facet_col_wrap=3, 
         facet_col_spacing=0.06, facet_row_spacing=0.1,
         title=f'Yearly Crime Counts by Place of Occurrence ({year_range[0]}–{year_range[1]})',
         labels={'COUNT': 'Count', 'CRIME': 'Crime Type'},
         category_orders={"YEAR": sorted(yrs)} # Ensure years are sequential
     )
     sm_fig.update_layout(
-        # barmode='group', # Group bars by crime type within each year/place
         margin=dict(t=60, l=20, r=20, b=20), showlegend=True,
         legend_title_text='Crime Type', title_x=0.5,
-        height=max(600, 200 * ((len(dfp['PLACE'].unique())-1) // 3 + 1)) # Dynamic height
+        height=max(600, 200 * ((len(dfp['PLACE'].unique())-1) // 3 + 1)) 
     )
-    sm_fig.for_each_yaxis(lambda ax: ax.update(matches=None, showticklabels=True, title='')) # Unlink y-axes, remove title
-    sm_fig.for_each_xaxis(lambda ax: ax.update(matches=None, title='Year')) # Unlink x-axes
+    sm_fig.for_each_yaxis(lambda ax: ax.update(matches=None, showticklabels=True, title='')) 
+    sm_fig.for_each_xaxis(lambda ax: ax.update(matches=None, title='Year')) 
     sm_fig.update_traces(hovertemplate='Year: %{x}<br>Count: %{y:,}<extra></extra>')
 
 
@@ -2446,20 +2357,13 @@ def update_sankey(selected_year, top_n_states):
     # Ensure columns are standardized and numeric
     df_murder_std = df_murder.rename(columns={'Area_Name': 'STATE', 'Year':'YEAR',
                                             'Sub_Group_Name':'SUBGROUP',
-                                            'Victims_Above_50_Yrs':'VICTIMS_ADULT', # Grouping example
+                                            'Victims_Above_50_Yrs':'VICTIMS_ADULT', 
                                             'Victims_Upto_10_15_18_30_50_Yrs': 'VICTIMS_NON_ADULT'}) # Simplified
 
-    # Combine age groups (Example: Adult vs Non-Adult - adjust logic as needed)
-    # This requires careful definition based on available columns
-    # For this example, let's assume 'victims adult' and 'victims non adult' columns exist (as in original code)
-    # If not, they need to be created by summing appropriate age columns.
-    # Assuming 'victims adult' and 'victims non adult' columns are correctly available or created:
-    numeric_cols = ['victims adult', 'victims non adult'] # Make sure these columns exist in df_murder
+    numeric_cols = ['victims adult', 'victims non adult'] 
     for col in numeric_cols:
          if col not in df_murder.columns:
-             # Handle missing columns - maybe create them or return error figure
              print(f"Warning: Sankey diagram requires column '{col}' which is missing.")
-             # As a fallback, let's try summing all victim columns if specific ones are missing
              victim_cols = [c for c in df_murder.columns if c.startswith('Victims_')]
              if len(victim_cols) >= 2:
                  df_murder['victims adult'] = df_murder[[c for c in victim_cols if 'Above' in c or '30_50' in c]].sum(axis=1, skipna=True)
@@ -2473,22 +2377,16 @@ def update_sankey(selected_year, top_n_states):
 
 
     year_df = df_murder[df_murder['Year'] == selected_year]
-    #print(year_df.head)
-    # Get top N states by total victims
     total_victims = year_df.groupby('Area_Name')[numeric_cols].sum()
     total_victims['total'] = total_victims.sum(axis=1)
-    # Ensure top_n_states is not greater than available states
     top_n_states = min(top_n_states, len(total_victims))
     top_states = total_victims.nlargest(top_n_states, 'total').index.tolist()
 
-
-    # Filter for top states and relevant subgroups (assuming Male/Female subgroups exist)
-    gender_subgroups = ['1. Male Victims', '2. Female Victims'] # Check actual subgroup names
-    # Find actual subgroup names if they differ
+    gender_subgroups = ['1. Male Victims', '2. Female Victims'] 
     actual_subgroups = [sg for sg in gender_subgroups if sg in year_df['Sub_Group_Name'].unique()]
     if not actual_subgroups:
          # Handle case where expected subgroups are missing
-         # Try finding any gender-like subgroups
+         # finding any gender-like subgroups
          potential_genders = [sg for sg in year_df['Sub_Group_Name'].unique() if 'Male' in sg or 'Female' in sg]
          if potential_genders:
              actual_subgroups = potential_genders
@@ -2510,7 +2408,7 @@ def update_sankey(selected_year, top_n_states):
     # --- Sankey Logic ---
     sources, targets, values = [], [], []
     node_labels = []
-    node_map = {} # Map label to index
+    node_map = {} 
 
     def get_node_index(label):
         if label not in node_map:
@@ -2518,14 +2416,13 @@ def update_sankey(selected_year, top_n_states):
             node_labels.append(label)
         return node_map[label]
 
-    # Define node types and their colors
     state_nodes = top_states
-    gender_nodes = [sg.split('. ')[-1] for sg in actual_subgroups] # Clean labels 'Male Victims' -> 'Male Victims'
+    gender_nodes = [sg.split('. ')[-1] for sg in actual_subgroups] 
     age_nodes = ['Adult', 'Non-Adult']
 
     node_colors_map = {
         'state': '#a6cee3', # Light Blue
-        'gender': '#fdbf6f', # Light Orange (adjust if more than 2 genders)
+        'gender': '#fdbf6f', # Light Orange 
         'age': '#b2df8a'     # Light Green
     }
     node_colors_list = []
@@ -2533,16 +2430,16 @@ def update_sankey(selected_year, top_n_states):
     # 1. State to Gender Links
     for state in state_nodes:
         state_idx = get_node_index(state)
-        node_colors_list.append(node_colors_map['state']) # Add color for state node
+        node_colors_list.append(node_colors_map['state']) 
         for sg_raw, gender_label in zip(actual_subgroups, gender_nodes):
             gender_idx = get_node_index(gender_label)
-            if gender_label not in [node_labels[i] for i in range(len(node_labels)-1)]: # Add gender color only once
+            if gender_label not in [node_labels[i] for i in range(len(node_labels)-1)]: 
                  node_colors_list.append(node_colors_map['gender'])
 
             val = sankey_df[
                 (sankey_df['Area_Name'] == state) &
                 (sankey_df['Sub_Group_Name'] == sg_raw)
-            ][numeric_cols].sum().sum() # Sum adult and non-adult for this state/gender
+            ][numeric_cols].sum().sum() 
 
             if val > 0:
                 sources.append(state_idx)
@@ -2551,7 +2448,7 @@ def update_sankey(selected_year, top_n_states):
 
     # 2. Gender to Age Links
     for gender_label in gender_nodes:
-        gender_idx = get_node_index(gender_label) # Should exist now
+        gender_idx = get_node_index(gender_label) 
         sg_raw = next(sg for sg, gl in zip(actual_subgroups, gender_nodes) if gl == gender_label) # Find original subgroup name
 
         # Adult Link
@@ -2573,10 +2470,10 @@ def update_sankey(selected_year, top_n_states):
             values.append(non_adult_val)
 
 
-    # Create Link Colors (optional, can make complex)
+    # Create Link Colors 
     link_colors = ['rgba(166,206,227,0.6)' if node_labels[s] in state_nodes else # State links: semi-transparent blue
                    'rgba(253,191,111,0.6)' if node_labels[s] == 'Male Victims' else # Male links: semi-transparent orange
-                   'rgba(251,154,153,0.6)' # Female links: semi-transparent pink (adjust if more genders)
+                   'rgba(251,154,153,0.6)' # Female links: semi-transparent pink 
                    for s in sources]
 
 
@@ -2588,8 +2485,8 @@ def update_sankey(selected_year, top_n_states):
         ),
         link=dict(
             source=sources, target=targets, value=values,
-            color=link_colors, # Optional link coloring
-            hovertemplate='Flow from %{source.label} to %{target.label}: %{value:,}<extra></extra>' # Add formatting
+            color=link_colors, 
+            hovertemplate='Flow from %{source.label} to %{target.label}: %{value:,}<extra></extra>' 
         )
     )])
 

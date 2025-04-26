@@ -8,46 +8,19 @@ import json
 from sklearn.linear_model import LinearRegression
 from rapidfuzz import process, fuzz
 import os
-from sklearn.metrics import silhouette_samples
-import dash
-from dash import dcc, html, Input, Output, State
-import plotly.express as px
-import plotly.graph_objects as go
-import plotly.figure_factory as ff
-import pandas as pd
-import numpy as np
-import json
-from rapidfuzz import process, fuzz
-import warnings
-import os
-import plotly.figure_factory as ff
-from plotly.subplots import make_subplots
-from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import silhouette_samples, silhouette_score
-from dash import dcc, html, Input, Output, State, no_update
-# if you know you have, say, 4 cores:
-os.environ["LOKY_MAX_CPU_COUNT"] = "2"
-
-# ML imports
+import warnings
+from sklearn.preprocessing import StandardScaler
 from statsmodels.tsa.arima.model import ARIMA
 from sklearn.cluster import KMeans
-from sklearn.ensemble import IsolationForest
-from sklearn.metrics import pairwise_distances
 
-# if you know you have, say, 4 cores:
 os.environ["LOKY_MAX_CPU_COUNT"] = "2"
 
-# ML imports
-from statsmodels.tsa.arima.model import ARIMA
-from sklearn.cluster import KMeans
-from sklearn.ensemble import IsolationForest
-from sklearn.metrics import pairwise_distances
-
-# Enable dynamic callback exceptions.
+# Enabled dynamic callback exceptions.
 app = dash.Dash(
     __name__,
     suppress_callback_exceptions=True,
-    external_stylesheets=['assets/drawer_styles.css'], # Example if using assets folder
+    external_stylesheets=['assets/drawer_styles.css'], 
     meta_tags=[
         {"name": "viewport", "content": "width=device-width, initial-scale=1.0"}
     ],
@@ -59,7 +32,7 @@ server = app.server
 crime_options = {
     'ipc': [
         "MURDER", "ATTEMPT_TO_MURDER", "CULPABLE_HOMICIDE_NOT_AMOUNTING_TO_MURDER", "RAPE",
-        "CUSTODIAL_RAPE", "OTHER_RAPE", "KIDNAPPING_AND_ABDUCTION", # Standardized name
+        "CUSTODIAL_RAPE", "OTHER_RAPE", "KIDNAPPING_AND_ABDUCTION", 
         "KIDNAPPING_AND_ABDUCTION_OF_WOMEN_AND_GIRLS", "KIDNAPPING_AND_ABDUCTION_OF_OTHERS",
         "DACOITY", "PREPARATION_AND_ASSEMBLY_FOR_DACOITY", "ROBBERY", "BURGLARY",
         "THEFT", "AUTO_THEFT", "OTHER_THEFT", "RIOTS", "CRIMINAL_BREACH_OF_TRUST",
@@ -74,13 +47,13 @@ crime_options = {
         "PROTECTION_OF_CIVIL_RIGHTS_(PCR)_ACT", "OTHER_CRIMES_AGAINST_SCS"
     ],
     'st': [
-        "MURDER", "RAPE", "KIDNAPPING_AND_ABDUCTION", # Standardized name
+        "MURDER", "RAPE", "KIDNAPPING_AND_ABDUCTION", 
         "DACOITY", "ROBBERY", "ARSON",
         "HURT", "PROTECTION_OF_CIVIL_RIGHTS_(PCR)_ACT",
         "PREVENTION_OF_ATROCITIES_(POA)_ACT", "OTHER_CRIMES_AGAINST_STS"
     ],
     'children': [
-        "RAPE", "KIDNAPPING_AND_ABDUCTION", # Standardized name
+        "RAPE", "KIDNAPPING_AND_ABDUCTION", 
         "FOETICIDE", "ABETMENT_OF_SUICIDE",
         "EXPOSURE_AND_ABANDONMENT", "PROCURATION_OF_MINOR_GIRLS",
         "BUYING_OF_GIRLS_FOR_PROSTITUTION", "SELLING_OF_GIRLS_FOR_PROSTITUTION",
@@ -92,9 +65,9 @@ crime_options = {
         "CRUELTY_BY_HUSBAND_OR_HIS_RELATIVES","IMPORTATION_OF_GIRLS"
     ]
 }
-crime_features = [ # Used for Clustering Tab (IPC features)
+crime_features = [ 
     "MURDER", "ATTEMPT_TO_MURDER", "CULPABLE_HOMICIDE_NOT_AMOUNTING_TO_MURDER", "RAPE",
-        "CUSTODIAL_RAPE", "OTHER_RAPE", "KIDNAPPING_AND_ABDUCTION", # Use standardized name here too
+        "CUSTODIAL_RAPE", "OTHER_RAPE", "KIDNAPPING_AND_ABDUCTION", 
         "KIDNAPPING_AND_ABDUCTION_OF_WOMEN_AND_GIRLS", "KIDNAPPING_AND_ABDUCTION_OF_OTHERS",
         "DACOITY", "PREPARATION_AND_ASSEMBLY_FOR_DACOITY", "ROBBERY", "BURGLARY",
         "THEFT", "AUTO_THEFT", "OTHER_THEFT", "RIOTS", "CRIMINAL_BREACH_OF_TRUST",
@@ -111,8 +84,7 @@ def standardize_columns(df):
     df.columns = [col.upper().strip().replace(" ", "_") for col in df.columns]
     if "STATE/UT" in df.columns:
         df = df.rename(columns={"STATE/UT": "STATE"})
-    # Specific renames needed for consistency across files
-    if "YEAR" in df.columns and df["YEAR"].dtype == object: # Check if 'Year' is already standardized
+    if "YEAR" in df.columns and df["YEAR"].dtype == object: 
         df = df.rename(columns={"YEAR": "YEAR"})
     elif "Year" in df.columns:
          df = df.rename(columns={"Year": "YEAR"}) # Standardize 'Year' to 'YEAR'
@@ -123,39 +95,32 @@ def standardize_columns(df):
     if "KIDNAPPING_&_ABDUCTION" in df.columns: # IPC
         df = df.rename(columns={"KIDNAPPING_&_ABDUCTION": "KIDNAPPING_AND_ABDUCTION"})
 
-
-    # Ensure numeric columns are treated as such, coercing errors
     for col in df.columns:
-        if col not in ['STATE', 'DISTRICT', 'YEAR']: # Keep identifiers as objects/strings
+        if col not in ['STATE', 'DISTRICT', 'YEAR']: 
             df[col] = pd.to_numeric(df[col], errors='coerce')
-            # Optional: fill NaNs created by coercion if needed, e.g., with 0
-            # df[col] = df[col].fillna(0)
 
     return df
 
 def calculate_total_crimes(df, category):
     """Calculates a TOTAL_CRIMES column based on category."""
+
     total_col_name = 'TOTAL_CRIMES'
     if category == 'ipc':
-        # IPC already has TOTAL_IPC_CRIMES, rename it for consistency
         if 'TOTAL_IPC_CRIMES' in df.columns:
             df = df.rename(columns={'TOTAL_IPC_CRIMES': total_col_name})
-        else: # Fallback if TOTAL_IPC_CRIMES is missing
+        else:
              df[total_col_name] = df[crime_options['ipc']].sum(axis=1, skipna=True)
     elif category == 'sc':
         cols_to_sum = crime_options['sc']
-        # Ensure all columns exist, handle potential missing ones gracefully
         valid_cols = [col for col in cols_to_sum if col in df.columns]
         df[total_col_name] = df[valid_cols].sum(axis=1, skipna=True)
     elif category == 'st':
         cols_to_sum = crime_options['st']
-         # Rename 'KIDNAPPING_ABDUCTION' if present before summing
         if "KIDNAPPING_ABDUCTION" in cols_to_sum:
             cols_to_sum = [c if c != "KIDNAPPING_ABDUCTION" else "KIDNAPPING_AND_ABDUCTION" for c in cols_to_sum]
         valid_cols = [col for col in cols_to_sum if col in df.columns]
         df[total_col_name] = df[valid_cols].sum(axis=1, skipna=True)
     elif category == 'children':
-        # Use the existing 'TOTAL' column if available and seems correct, else sum
         if 'TOTAL' in df.columns:
             df = df.rename(columns={'TOTAL': total_col_name})
         else:
@@ -167,7 +132,6 @@ def calculate_total_crimes(df, category):
         valid_cols = [col for col in cols_to_sum if col in df.columns]
         df[total_col_name] = df[valid_cols].sum(axis=1, skipna=True)
 
-    # Convert YEAR to string *after* potential numeric operations
     if 'YEAR' in df.columns:
         df['YEAR'] = df['YEAR'].astype(str)
 
@@ -187,10 +151,8 @@ def load_and_clean_csv1(file_path):
 def load_and_clean_csv(file_path, category):
     df = pd.read_csv(file_path)
     df = standardize_columns(df)
-    # Remove aggregated rows (where DISTRICT is "TOTAL")
     df = df[df["DISTRICT"] != "TOTAL"]
-    df = calculate_total_crimes(df, category) # Calculate totals based on category
-    # Ensure YEAR is string after all processing
+    df = calculate_total_crimes(df, category) 
     df['YEAR'] = df['YEAR'].astype(str)
     return df
 
@@ -202,21 +164,21 @@ df_sc = load_and_clean_csv('final_data/02_01_District_wise_crimes_committed_agai
 df_st = load_and_clean_csv('final_data/02_District_wise_crimes_committed_against_ST_final.csv', 'st')
 df_children = load_and_clean_csv('final_data/03_District_wise_crimes_committed_against_children_final.csv', 'children')
 df_women = load_and_clean_csv('final_data/42_District_wise_crimes_committed_against_women_2001_2013.csv', 'women')
-
 df_juv_edu      = load_and_clean_csv1('final_data/18_01_Juveniles_arrested_Education.csv')
 df_juv_econ     = load_and_clean_csv1('final_data/18_02_Juveniles_arrested_Economic_setup.csv')
 df_juv_family   = load_and_clean_csv1('final_data/18_03_Juveniles_arrested_Family_background.csv')
 df_juv_recidiv  = load_and_clean_csv1('final_data/18_04_Juveniles_arrested_Recidivism.csv')
-
-
+df_murder = pd.read_csv('final_data/32_Murder_victim_age_sex.csv')
+df_cust = pd.read_csv("./final_data/40_05_Custodial_death_others.csv")
+df_bar = pd.read_csv('final_data/serious_fraud.csv')
 df_stolen = pd.read_csv('final_data/property_stolen.csv')
 df_stolen['Year'] = pd.to_numeric(df_stolen['Year'], errors='coerce').astype('Int64')
 df_stolen = df_stolen.dropna(subset=['Year'])
 df_stolen['Year'] = df_stolen['Year'].astype(int)
-
 avail_states = sorted(df_stolen['Area_Name'].unique())
 yr_min, yr_max = df_stolen['Year'].min(), df_stolen['Year'].max()
 default_range = [yr_min, yr_max]
+CSV_PATH = "final_data/38_Unidentified_dead_bodies_recovered_and_inquest_conducted.csv"
 
 dropdown_style = {
     'backgroundColor': '#ffffff',
@@ -224,23 +186,16 @@ dropdown_style = {
     'border': '1px solid #e0e0e0',
     'marginBottom': '15px'
 }
-card_style = { # Consistent card styling for plots
+card_style = { 
     'backgroundColor': '#ffffff', 'borderRadius': '8px', 'boxShadow': '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)',
     'padding': '15px', 'marginBottom': '20px'
 }
 
 
-
-
-# Define a consistent color palette (Plotly's default qualitative scale)
-# This scale avoids pure white and offers good distinctiveness.
 CLUSTER_COLORS = px.colors.qualitative.Plotly
-# Define the color for unselected/filtered clusters on the map
-UNSELECTED_CLUSTER_COLOR = 'rgb(255, 255, 255)' # White
-# Define the color for districts not part of any cluster (e.g., missing data)
-MISSING_DATA_COLOR = 'rgb(200, 200, 200)' # Grey
+UNSELECTED_CLUSTER_COLOR = 'rgb(255, 255, 255)' 
+MISSING_DATA_COLOR = 'rgb(200, 200, 200)' #Grey
 
-CSV_PATH = "final_data/38_Unidentified_dead_bodies_recovered_and_inquest_conducted.csv"
 df_heat = pd.read_csv(CSV_PATH)
 heatmap_data = df_heat.pivot(
     index="Area_Name", columns="Year",
@@ -255,9 +210,6 @@ fig_heat = px.imshow(
 )
 fig_heat.update_yaxes(categoryorder="total ascending")
 
-# --- 3. BAR CHART (from new.py) ---
-# Load and preprocess
-df_bar = pd.read_csv('final_data/serious_fraud.csv')
 loss_cols = [
     'Loss_of_Property_1_25_Crores',
     'Loss_of_Property_25_100_Crores',
@@ -284,7 +236,7 @@ states = ['All'] + sorted(df_long['Area_Name'].unique())
 default_states = ['Andhra Pradesh','Madhya Pradesh','Kerala']
 
 
-# Combine DataFrames for easier access (optional but can simplify callbacks)
+# Combine DataFrames for easier access
 dataframes = {
     'ipc': df_ipc,
     'sc': df_sc,
@@ -293,8 +245,6 @@ dataframes = {
     'women': df_women
 }
 
-
-df_cust = pd.read_csv("./final_data/40_05_Custodial_death_others.csv")
 df_cust.replace("NULL", np.nan, inplace=True)
 cols = [
     'CD_Accidents',
@@ -307,7 +257,6 @@ cols = [
 for c in cols:
     df_cust[c] = df_cust[c].astype(float).fillna(0)
 
-# 2. Melt into long form
 melted = df_cust.melt(
     id_vars=['Area_Name', 'Year'],
     value_vars=cols,
@@ -327,10 +276,6 @@ cust_states = sorted(df_cust['Area_Name'].unique())
 
 # Define global options for the dropdown
 STATE_OPTIONS = [{'label': s, 'value': s} for s in cust_states]
-
-
-
-df_murder = pd.read_csv('final_data/32_Murder_victim_age_sex.csv')
 
 
 csv_file_path = 'final_data/34_Use_of_fire_arms_in_murder_cases.csv'
@@ -368,6 +313,7 @@ df_place_long = df_place.melt(
 
 # Split PLACE_CRIME into separate PLACE and CRIME fields
 df_place_long[['PLACE','CRIME']] = df_place_long['PLACE_CRIME'].str.split(' - ', expand=True)
+
 # Define column names based on your description
 area_col = 'Area_Name'
 year_col = 'Year' # Though we aggregate over it
@@ -382,26 +328,24 @@ def load_and_clean_kidnapping_purpose_csv(file_path):
     try:
         # Read CSV, explicitly handle 'NULL' as NaN
         df = pd.read_csv(file_path, na_values=['NULL', 'Null', 'null', ''])
-        print(f"Initial columns in kidnapping CSV: {df.columns.tolist()}") # Debug: Check initial columns
+        print(f"Initial columns in kidnapping CSV: {df.columns.tolist()}") 
 
-        # Standardize columns (using existing function)
+        # Standardize columns
         df = standardize_columns(df)
-        print(f"Standardized columns in kidnapping CSV: {df.columns.tolist()}") # Debug: Check standardized columns
+        print(f"Standardized columns in kidnapping CSV: {df.columns.tolist()}") 
 
         # Rename key columns for clarity and consistency
         rename_map = {
             'AREA_NAME': 'STATE',
             'YEAR': 'YEAR',
             'SUB_GROUP_NAME': 'PURPOSE',
-            'K_A_GRAND_TOTAL': 'COUNT' # This seems to be the count for the specific purpose
-            # Add other potential renames if needed based on standardize_columns output
+            'K_A_GRAND_TOTAL': 'COUNT' 
         }
-        # Apply only valid renames
+        
         valid_rename_map = {k: v for k, v in rename_map.items() if k in df.columns}
         df = df.rename(columns=valid_rename_map)
-        print(f"Renamed columns in kidnapping CSV: {df.columns.tolist()}") # Debug: Check after rename
+        print(f"Renamed columns in kidnapping CSV: {df.columns.tolist()}") 
 
-        # Check if essential columns exist after rename
         required_cols = ['STATE', 'YEAR', 'PURPOSE', 'COUNT']
         missing_req = [col for col in required_cols if col not in df.columns]
         if missing_req:
@@ -409,31 +353,21 @@ def load_and_clean_kidnapping_purpose_csv(file_path):
 
         # Convert COUNT and YEAR to numeric, coercing errors
         df['COUNT'] = pd.to_numeric(df['COUNT'], errors='coerce')
-        df['YEAR'] = pd.to_numeric(df['YEAR'], errors='coerce') # Keep as numeric for range slider
+        df['YEAR'] = pd.to_numeric(df['YEAR'], errors='coerce') # numeric for range slider
 
         # Fill NaNs in COUNT with 0
-        df['COUNT'] = df['COUNT'].fillna(0).astype(int) # Convert to int after filling NaN
+        df['COUNT'] = df['COUNT'].fillna(0).astype(int) 
 
-        # Drop rows where YEAR is NaN (due to coercion errors or original missing data)
+        # Drop rows where YEAR is NaN
         df = df.dropna(subset=['YEAR'])
-        df['YEAR'] = df['YEAR'].astype(int) # Convert YEAR to int
-
-        # ---- FIX STARTS HERE ----
-        # Ensure PURPOSE is string type before using .str accessor
-        # Fill NaN with an empty string first, then convert type
+        df['YEAR'] = df['YEAR'].astype(int) 
         df['PURPOSE'] = df['PURPOSE'].fillna('').astype(str)
-        # Clean the PURPOSE column for dropdown labels
-        # Example: "01. For Adoption" -> "For Adoption"
         df['PURPOSE_CLEAN'] = df['PURPOSE'].str.replace(r'^\d+\.\s*', '', regex=True).str.strip()
-        # ---- FIX ENDS HERE ----
 
-        print(f"Unique Cleaned Purposes: {df['PURPOSE_CLEAN'].unique()}") # Debug: Check cleaned purposes
-
-        # Filter out any potential total rows if they exist (though unlikely based on structure)
+        print(f"Unique Cleaned Purposes: {df['PURPOSE_CLEAN'].unique()}")
+        # Filter out any potential total rows if they exist
         df = df[~df['STATE'].str.contains("TOTAL", na=False, case=False)]
-
-        print(f"Kidnapping data loaded successfully. Shape: {df.shape}") # Debug: Confirm successful load
-
+        # print(f"Kidnapping data loaded successfully. Shape: {df.shape}")
         return df
 
     except FileNotFoundError:
@@ -447,7 +381,7 @@ def load_and_clean_kidnapping_purpose_csv(file_path):
         # traceback.print_exc() # Uncomment for more detailed traceback during debugging
         return pd.DataFrame()
 
-
+df_kidnap = load_and_clean_kidnapping_purpose_csv('final_data/39_Specific_purpose_of_kidnapping_and_abduction.csv')
 
 def standardize_columns1(df):
     """
@@ -466,52 +400,41 @@ def standardize_columns1(df):
         df = df.rename(columns={"STATE/UT": "STATE"})
     # Rename AREA_NAME if present (used in some files like murder, relatives, kidnap)
     if "AREA_NAME" in df.columns:
-        df = df.rename(columns={"AREA_NAME": "STATE"}) # Assuming AREA_NAME maps to STATE
+        df = df.rename(columns={"AREA_NAME": "STATE"}) #AREA_NAME maps to STATE
 
     # Handle variations of Year column
     if "YEAR" in df.columns and df["YEAR"].dtype == object:
         pass # Already standardized or correct type
     elif "YEAR" in df.columns and df["YEAR"].dtype != object:
-         df['YEAR'] = df['YEAR'].astype(str) # Convert numeric Year to string if needed early
+         df['YEAR'] = df['YEAR'].astype(str) 
     elif "Year" in df.columns:
-         df = df.rename(columns={"Year": "YEAR"}) # Standardize 'Year' to 'YEAR'
-         df['YEAR'] = df['YEAR'].astype(str) # Ensure it's string after rename
+         df = df.rename(columns={"Year": "YEAR"}) 
+         df['YEAR'] = df['YEAR'].astype(str) 
 
-    # Rename specific kidnapping columns for consistency
     if "KIDNAPPING_ABDUCTION" in df.columns: # Found in ST data
         df = df.rename(columns={"KIDNAPPING_ABDUCTION": "KIDNAPPING_AND_ABDUCTION"})
     if "KIDNAPPING_&_ABDUCTION" in df.columns: # Found in IPC data
         df = df.rename(columns={"KIDNAPPING_&_ABDUCTION": "KIDNAPPING_AND_ABDUCTION"})
 
-    # List of columns known *not* to be numeric (Identifiers or text categories)
-    # This list should cover all potential non-numeric columns across *all* datasets loaded.
     non_numeric_cols = [
-        'STATE', 'DISTRICT', 'YEAR',          # Basic identifiers
-        'GROUP_NAME', 'SUB_GROUP_NAME',      # From Kidnapping file
-        'PURPOSE', 'PURPOSE_CLEAN',          # Columns possibly created from kidnapping file
-        'RELATIONSHIP',                      # From Relatives file
-        'PLACE_CRIME', 'PLACE', 'CRIME',      # From Place Occurrence file
-        'CRIME_TYPE', 'CRIME_LABEL',         # Potentially created in callbacks
-        'CLUSTERLABEL',                      # From Clustering tab
-        'TYPE'                               # From Clustering tab (history/forecast)
-        # Add any other known text columns from any of your files here
+        'STATE', 'DISTRICT', 'YEAR',          
+        'GROUP_NAME', 'SUB_GROUP_NAME',      
+        'PURPOSE', 'PURPOSE_CLEAN',          
+        'RELATIONSHIP',                      
+        'PLACE_CRIME', 'PLACE', 'CRIME',      
+        'CRIME_TYPE', 'CRIME_LABEL',         
+        'CLUSTERLABEL',                      
+        'TYPE'                               
     ]
-    # Make sure the check is case-insensitive by comparing against uppercase list
     non_numeric_cols_upper = [col.upper() for col in non_numeric_cols]
 
-    # Attempt numeric conversion only for columns *not* in the non_numeric_cols list
+    # Attempt numeric conversion only for columns not in the non_numeric_cols list
     for col in df.columns:
         if col not in non_numeric_cols_upper:
-            # print(f"Attempting to convert '{col}' to numeric...") # Uncomment for debugging
             try:
-                # Use errors='coerce' - invalid parsing will be set as NaN
                 df[col] = pd.to_numeric(df[col], errors='coerce')
-                # You might decide later if filling NaNs is needed for specific columns
-                # For example: df[col] = df[col].fillna(0)
             except Exception as e:
-                # This catch is mainly for unexpected issues, coercion errors are handled by 'coerce'
                 print(f"Warning: Could not process column '{col}' for numeric conversion: {e}")
-        # Ensure YEAR is string at the end if it exists (sometimes pd.to_numeric might change it)
         elif col == 'YEAR' and 'YEAR' in df.columns:
              if df['YEAR'].dtype != object:
                  df['YEAR'] = df['YEAR'].astype(str)
@@ -524,26 +447,23 @@ def load_and_clean_kidnapping_purpose_csv(file_path):
     try:
         # Read CSV, explicitly handle 'NULL' as NaN
         df = pd.read_csv(file_path, na_values=['NULL', 'Null', 'null', ''])
-        print(f"Initial columns in kidnapping CSV: {df.columns.tolist()}") # Debug: Check initial columns
+        # print(f"Initial columns in kidnapping CSV: {df.columns.tolist()}") 
 
-        # Standardize columns (using existing function)
         df = standardize_columns1(df)
-        print(f"Standardized columns in kidnapping CSV: {df.columns.tolist()}") # Debug: Check standardized columns
+        # print(f"Standardized columns in kidnapping CSV: {df.columns.tolist()}") 
 
         # Rename key columns for clarity and consistency
         rename_map = {
             'AREA_NAME': 'STATE',
             'YEAR': 'YEAR',
             'SUB_GROUP_NAME': 'PURPOSE',
-            'K_A_GRAND_TOTAL': 'COUNT' # This seems to be the count for the specific purpose
-            # Add other potential renames if needed based on standardize_columns output
+            'K_A_GRAND_TOTAL': 'COUNT'
         }
-        # Apply only valid renames
+        
         valid_rename_map = {k: v for k, v in rename_map.items() if k in df.columns}
         df = df.rename(columns=valid_rename_map)
-        print(f"Renamed columns in kidnapping CSV: {df.columns.tolist()}") # Debug: Check after rename
+        # print(f"Renamed columns in kidnapping CSV: {df.columns.tolist()}") 
 
-        # Check if essential columns exist after rename
         required_cols = ['STATE', 'YEAR', 'PURPOSE', 'COUNT']
         missing_req = [col for col in required_cols if col not in df.columns]
         if missing_req:
@@ -551,93 +471,63 @@ def load_and_clean_kidnapping_purpose_csv(file_path):
 
         # Convert COUNT and YEAR to numeric, coercing errors
         df['COUNT'] = pd.to_numeric(df['COUNT'], errors='coerce')
-        df['YEAR'] = pd.to_numeric(df['YEAR'], errors='coerce') # Keep as numeric for range slider
+        df['YEAR'] = pd.to_numeric(df['YEAR'], errors='coerce') # numeric for range slider
 
         # Fill NaNs in COUNT with 0
         df['COUNT'] = df['COUNT'].fillna(0).astype(int) # Convert to int after filling NaN
-
-        # Drop rows where YEAR is NaN (due to coercion errors or original missing data)
         df = df.dropna(subset=['YEAR'])
         df['YEAR'] = df['YEAR'].astype(int) # Convert YEAR to int
-
-        # ---- FIX STARTS HERE ----
-        # Ensure PURPOSE is string type before using .str accessor
-        # Fill NaN with an empty string first, then convert type
         df['PURPOSE'] = df['PURPOSE'].fillna('').astype(str)
-        # Clean the PURPOSE column for dropdown labels
-        # Example: "01. For Adoption" -> "For Adoption"
         df['PURPOSE_CLEAN'] = df['PURPOSE'].str.replace(r'^\d+\.\s*', '', regex=True).str.strip()
-        # ---- FIX ENDS HERE ----
-
-        print(f"Unique Cleaned Purposes: {df['PURPOSE_CLEAN'].unique()}") # Debug: Check cleaned purposes
-
-        # Filter out any potential total rows if they exist (though unlikely based on structure)
         df = df[~df['STATE'].str.contains("TOTAL", na=False, case=False)]
-
-        print(f"Kidnapping data loaded successfully. Shape: {df.shape}") # Debug: Confirm successful load
-
         return df
 
     except FileNotFoundError:
         print(f"Error: Kidnapping CSV file not found at '{file_path}'")
-        return pd.DataFrame() # Return empty DataFrame on error
+        return pd.DataFrame() 
     except ValueError as ve:
         print(f"Data Error during kidnapping CSV processing: {ve}")
         return pd.DataFrame()
     except Exception as e:
         print(f"An unexpected error occurred loading/cleaning kidnapping CSV: {e}")
-        # traceback.print_exc() # Uncomment for more detailed traceback during debugging
         return pd.DataFrame()
 
-
-
-
-# Load the kidnapping data
-df_kidnap = load_and_clean_kidnapping_purpose_csv('final_data/39_Specific_purpose_of_kidnapping_and_abduction.csv')
 
 if os.path.exists(csv_file_path):
     try:
         df_raw = pd.read_csv(csv_file_path)
 
         # --- Data Preprocessing and Aggregation ---
-        # Ensure the comparison columns exist and are numeric, fill NaNs with 0
         numeric_cols_to_aggregate = []
-        standardized_comparison_cols = [] # Store standardized names used for aggregation
+        standardized_comparison_cols = [] 
         for col in comparison_cols:
             if col in df_raw.columns:
-                # Standardize column names like the rest of your data
                 standardized_col_name = col.upper().strip().replace(" ", "_")
-                df_raw = df_raw.rename(columns={col: standardized_col_name}) # Rename in df_raw
+                df_raw = df_raw.rename(columns={col: standardized_col_name}) 
                 df_raw[standardized_col_name] = pd.to_numeric(df_raw[standardized_col_name], errors='coerce')
-                numeric_cols_to_aggregate.append(standardized_col_name) # Use standardized name
+                numeric_cols_to_aggregate.append(standardized_col_name) 
                 standardized_comparison_cols.append(standardized_col_name)
             else:
                 print(f"Warning: Column '{col}' not found in CSV. Skipping.")
 
-        df_raw = df_raw.fillna(0) # Fill any NaNs resulting from coercion or missing data with 0
-
-        # Check and standardize area column if exists
+        df_raw = df_raw.fillna(0) 
         if area_col in df_raw.columns:
              standardized_area_col = area_col.upper().strip().replace(" ", "_")
              df_raw = df_raw.rename(columns={area_col: standardized_area_col})
-             area_col = standardized_area_col # Update area_col to standardized name
+             area_col = standardized_area_col 
         elif area_col.upper().strip().replace(" ", "_") in df_raw.columns:
-             # If it was already standardized by a general function (unlikely here, but safe check)
              area_col = area_col.upper().strip().replace(" ", "_")
         else:
              raise ValueError(f"Area column '{area_col}' not found in the CSV.")
 
-        # Aggregate: Group by Area_Name and sum the numeric comparison columns
-        if numeric_cols_to_aggregate: # Proceed only if there are valid columns to aggregate
-             # Use the potentially standardized area_col name for grouping
+        # Aggregating Group by Area_Name and sum the numeric comparison columns
+        if numeric_cols_to_aggregate: 
              df_aggregated = df_raw.groupby(area_col)[numeric_cols_to_aggregate].sum().reset_index()
-             # Update comparison_cols to only include those actually found and aggregated (standardized names)
-             comparison_cols = standardized_comparison_cols # Use the standardized names list
+             comparison_cols = standardized_comparison_cols
         else:
              print("Error: No valid numeric columns found for aggregation.")
-             # Keep df_aggregated empty
 
-        # Get unique area names for dropdowns
+        #unique area names for dropdowns
         if not df_aggregated.empty:
              areas = sorted(df_aggregated[area_col].unique())
 
@@ -647,7 +537,6 @@ if os.path.exists(csv_file_path):
          print(f"Data Error: {ve}")
     except Exception as e:
         print(f"Error loading or processing CSV '{csv_file_path}': {e}")
-        # Keep df_aggregated and areas as empty defaults
 else:
     print(f"Error: CSV file not found at '{csv_file_path}'")
 
@@ -662,7 +551,7 @@ all_subs   = sorted(df_rape['Subgroup'].unique())
 max_year   = df_rape['Year'].max()
 next_year  = max_year + 1
 
-# Build predictions
+# predictions
 preds = []
 for state in all_states + ['All States']:
     for sub in all_subs + ['All Subgroups']:
@@ -696,15 +585,6 @@ years = list(range(df_rape['Year'].min(), next_year+1))
 marks = {y:(str(y) if y<=max_year else f"{y} (pred)") for y in years}
 
 # -------------------------
-# Crime Type Options for Each Category (Make sure column names match standardized names)
-# -------------------------
-
-# -------------------------
-# Initial State Summary (Now based on IPC, will be updated dynamically)
-# -------------------------
-# state_summary = df_ipc.groupby("STATE")["TOTAL_CRIMES"].sum().reset_index() # Using standardized TOTAL_CRIMES
-
-# -------------------------
 # Load and Normalize GeoJSON Files
 # -------------------------
 def normalize_geojson(file_path, prop_key, new_key):
@@ -713,27 +593,19 @@ def normalize_geojson(file_path, prop_key, new_key):
             geo = json.load(f)
     except FileNotFoundError:
         print(f"Error: GeoJSON file not found at {file_path}")
-        return None # Return None if file not found
+        return None 
     except json.JSONDecodeError:
         print(f"Error: Could not decode JSON from {file_path}")
-        return None # Return None if JSON is invalid
+        return None 
 
     features = geo.get("features", [])
     if not features:
          print(f"Warning: No features found in {file_path}")
-         # Optionally return the empty structure or None depending on desired handling
-         return geo # Or return None
-
-    # print(f"Loaded {len(features)} features from {file_path}")
-    # if features:
-    #     print("First feature properties:", features[0]["properties"])
+         return geo 
 
     for feature in features:
-        # Ensure properties dictionary exists
         if "properties" not in feature or not isinstance(feature["properties"], dict):
-            feature["properties"] = {} # Initialize if missing or not a dict
-
-        # For states: use prop_key="NAME_1"; for districts: use "NAME_2"
+            feature["properties"] = {} 
         val = str(feature["properties"].get(prop_key, "")).upper().strip()
         feature["properties"][new_key] = val
     return geo
@@ -761,31 +633,26 @@ def fix_geojson_names(geo, csv_names, key):
         return None
     if not csv_names: # Check if csv names are available
         print(f"Skipping name fixing for {key} as CSV names are missing.")
-        return geo # Return original geojson
+        return geo 
 
     candidates = list(csv_names)
     mismatched_count = 0
     updated_count = 0
     for feature in geo["features"]:
-        # Ensure properties and key exist
         if "properties" not in feature or key not in feature["properties"]:
-            continue # Skip if properties or key are missing
+            continue 
 
         current = feature["properties"].get(key, "")
         if current not in csv_names:
             mismatched_count += 1
-            best = best_match_fuzzy(current, candidates, threshold=75) # Slightly increased threshold maybe
+            best = best_match_fuzzy(current, candidates, threshold=75) 
             if best:
-                # print(f"Updating {key} value '{current}' to best match '{best}'")
                 feature["properties"][key] = best
                 updated_count +=1
-            # else:
-            #     print(f"No suitable match found for {key} '{current}'") # Optional: log failures
 
     print(f"GeoJSON Name Fixing for '{key}': {mismatched_count} initial mismatches, {updated_count} updated.")
     return geo
 
-# --- Get unique names AFTER loading all dataframes ---
 all_states = set()
 all_districts = set()
 for df in dataframes.values():
@@ -794,12 +661,12 @@ for df in dataframes.values():
     if 'DISTRICT' in df.columns:
         all_districts.update(df['DISTRICT'].unique())
 
-# Now fix names using the comprehensive list
+# fixing names using the comprehensive list
 india_state_geo = fix_geojson_names(india_state_geo, all_states, "STATE_UPPER")
 india_district_geo = fix_geojson_names(india_district_geo, all_districts, "DISTRICT_UPPER")
 
 
-# After fixing, calculate missing entries.
+# After fixing, calculating missing entries.
 missing_states_info = "GeoJSON for states not loaded or has issues."
 missing_districts_info = "GeoJSON for districts not loaded or has issues."
 
@@ -814,16 +681,14 @@ if india_district_geo and 'features' in india_district_geo:
     missing_districts_info = f"Missing Districts (GeoJSON districts not found in any CSV): {sorted(list(missing_districts))}" if missing_districts else "All GeoJSON districts found in CSV data."
 
 
-print(missing_states_info)
-print(missing_districts_info)
+# print(missing_states_info)
+# print(missing_districts_info)
 
 # -------------------------
-# Helper Functions to Build Maps (Removed - Replaced by Callbacks)
+# Helper Functions to Build Maps 
 # -------------------------
-# build_state_map() and build_district_map() are removed as they will be generated dynamically
 
 def build_offender_treemap(top_n=15):
-    # Ensure Count is numeric
     df_rel_long['Count'] = pd.to_numeric(df_rel_long['Count'], errors='coerce').fillna(0)
 
     totals = (
@@ -840,7 +705,7 @@ def build_offender_treemap(top_n=15):
         path=['Area_Name', 'Relationship'],
         values='Count',
         color='Relationship', # Color by relationship type
-        color_discrete_sequence=px.colors.qualitative.Pastel, # Use a pleasant color scheme
+        color_discrete_sequence=px.colors.qualitative.Pastel, 
         title=f"Offender Relationship Breakdown (Top {top_n} States by Total Cases)"
     )
     fig.update_traces(
@@ -848,12 +713,12 @@ def build_offender_treemap(top_n=15):
         hovertemplate='<b>%{label}</b><br>Count: %{value:,}<br>Pct of Parent: %{percentParent:.1%}<br>Pct of Total: %{percentRoot:.1%}<extra></extra>'
     )
     fig.update_layout(margin=dict(t=50, l=25, r=25, b=25),
-                       title_x=0.5) # Center title
+                       title_x=0.5) 
     return fig
 
 
 ###################
-# Layout Snippets (Moved map-related controls directly into tab layouts)
+# Layout Snippets 
 ###################
 area_comparison_layout = html.Div([
     html.H3("Compare Firearm Victims Between Areas (Aggregated Across Years)"),
@@ -865,8 +730,8 @@ area_comparison_layout = html.Div([
             html.Label("Select Area 1:", style={'fontWeight': 'bold'}),
             dcc.Dropdown(
                 id='compare-area-dropdown-1',
-                options=[{'label': area, 'value': area} for area in areas], # Uses 'areas' list from data loading
-                value=areas[0] if areas else None, # Default to first area if available
+                options=[{'label': area, 'value': area} for area in areas], 
+                value=areas[0] if areas else None, 
                 clearable=False
             ),
         ], style={'width': '48%', 'display': 'inline-block', 'paddingRight': '2%'}),
@@ -876,8 +741,8 @@ area_comparison_layout = html.Div([
             html.Label("Select Area 2:", style={'fontWeight': 'bold'}),
             dcc.Dropdown(
                 id='compare-area-dropdown-2',
-                options=[{'label': area, 'value': area} for area in areas], # Uses 'areas' list
-                value=areas[1] if len(areas) > 1 else None, # Default to second area if available
+                options=[{'label': area, 'value': area} for area in areas], 
+                value=areas[1] if len(areas) > 1 else None, 
                 clearable=False
             ),
         ], style={'width': '48%', 'display': 'inline-block'}),
@@ -887,13 +752,12 @@ area_comparison_layout = html.Div([
     # Graph for Radar Plot
     dcc.Loading(
         id="loading-radar-chart",
-        type="circle", # or "graph", "cube", "dot"
+        type="circle", 
         children=[dcc.Graph(id='area-comparison-radar-plot')]
     )
 
 ], style={'padding': '25px'})
 
-# Common Style Variables
 dropdown_style = {
     'backgroundColor': '#ffffff',
     'borderRadius': '4px',
@@ -903,20 +767,21 @@ dropdown_style = {
 
 radio_style = {
     'display': 'flex',
-    'flexDirection': 'row', # Keep horizontal layout
-    'flexWrap': 'wrap', # Allow wrapping on smaller screens
-    'justifyContent': 'center', # Center items
+    'flexDirection': 'row', 
+    'flexWrap': 'wrap', 
+    'justifyContent': 'center', 
     'marginBottom': '15px',
     'padding': '10px',
-    'backgroundColor': '#f8f9fa', # Light background for the radio container
+    'backgroundColor': '#f8f9fa', 
     'borderRadius': '4px'
 }
 
 radio_label_style = {
     'display': 'inline-block',
-    'margin': '5px 15px 5px 0', # Add some vertical margin too
+    'margin': '5px 15px 5px 0', 
     'cursor': 'pointer'
 }
+
 #===========================================================================================================================
 #=======================================================dash app layout==============================================================================================
 app.layout = html.Div([
@@ -927,7 +792,6 @@ app.layout = html.Div([
             [html.Span(className="bar1"), html.Span(className="bar2"), html.Span(className="bar3")],
             id="btn-open-drawer", className="hamburger-button", n_clicks=0
         ),
-        # Main Title (Using the title from your original file)
         html.H1("Indian Crime Data Visualization Portal", className="main-title", style={'color':'white'})
     ], className="header-container"),
 
@@ -935,10 +799,8 @@ app.layout = html.Div([
     html.Nav(id="slide-out-drawer", className="drawer", children=[
         html.Button("×", id="btn-close-drawer", className="close-button", n_clicks=0),
         html.H4("Navigation", className="drawer-header"),
-        # List of links corresponding to your tabs
+        # List of links corresponding to our tabs
         html.Ul([
-            # !! IMPORTANT !!: Ensure these match the 'value' of your dcc.Tab components below
-            # The IDs MUST be 'link-{tab_value}'
             html.Li(html.A("State Wise Crimes", href="#", id="link-tab-statewise", className="drawer-link")),
             html.Li(html.A("District Wise Crimes", href="#", id="link-tab-districtwise", className="drawer-link")),
             html.Li(html.A("Year Wise Crimes", href="#", id="link-tab-yearwise", className="drawer-link")),
@@ -946,14 +808,14 @@ app.layout = html.Div([
             html.Li(html.A("Place of Occurrence", href="#", id="link-tab-placeoccurrence", className="drawer-link")),
             html.Li(html.A("Murder Victims by Age and Sex", href="#", id="link-tab-murderflow", className="drawer-link")),
             html.Li(html.A("Relationship with Offender", href="#", id="link-tab-offenderrel", className="drawer-link")),
-            html.Li(html.A("Clustering of Districts on IPC Crimes", href="#", id="link-tab-clusters", className="drawer-link")), # Value inferred from original structure
-            html.Li(html.A("Custodial Deaths Plots", href="#", id="link-tab-custodial", className="drawer-link")), # Value inferred
-            html.Li(html.A("Juvenile Background Analysis", href="#", id="link-tab-juvenile", className="drawer-link")), # Value inferred
-            html.Li(html.A("Unidentified Bodies Recovered", href="#", id="link-tab-heatmap", className="drawer-link")), # Value inferred
-            html.Li(html.A("Serious Fraud Losses", href="#", id="link-tab-fraud", className="drawer-link")), # Value inferred
-            html.Li(html.A("Property Stolen", href="#", id="link-tab-stolen", className="drawer-link")), # Value inferred
-            html.Li(html.A("Rape Victims Trends", href="#", id="link-tab-rape", className="drawer-link")), # Value inferred
-            html.Li(html.A("Kidnappings and Abduction", href="#", id="link-tab-kidnapping", className="drawer-link")), # Value inferred
+            html.Li(html.A("Clustering of Districts on IPC Crimes", href="#", id="link-tab-clusters", className="drawer-link")), 
+            html.Li(html.A("Custodial Deaths Plots", href="#", id="link-tab-custodial", className="drawer-link")), 
+            html.Li(html.A("Juvenile Background Analysis", href="#", id="link-tab-juvenile", className="drawer-link")), 
+            html.Li(html.A("Unidentified Bodies Recovered", href="#", id="link-tab-heatmap", className="drawer-link")), 
+            html.Li(html.A("Serious Fraud Losses", href="#", id="link-tab-fraud", className="drawer-link")), 
+            html.Li(html.A("Property Stolen", href="#", id="link-tab-stolen", className="drawer-link")), 
+            html.Li(html.A("Rape Victims Trends", href="#", id="link-tab-rape", className="drawer-link")), 
+            html.Li(html.A("Kidnappings and Abduction", href="#", id="link-tab-kidnapping", className="drawer-link")), 
 
         ], className="drawer-links-list")
     ]),
@@ -962,59 +824,54 @@ app.layout = html.Div([
     html.Div(id="drawer-overlay", className="drawer-overlay", n_clicks=0),
 
     # --- Main Content Area ---
-    # Adjusted wrapper div from your original file structure
-    html.Div([ # This corresponds to the outer html.Div wrapping your dcc.Tabs
+    
+    html.Div([ 
         dcc.Tabs(
             id="main-tabs",
             value='tab-statewise', # Default tab
             children=[
                 # === State Wise Tab ===
-                # Make sure the 'value' here matches the link id prefix ('tab-statewise')
                 dcc.Tab(label="State Wise", value='tab-statewise', children=[
                     html.Div([
-                        # --- Content from your original 'State Wise' tab ---
                         html.H3("State Level Crime Analysis", style={'textAlign': 'center', 'marginBottom': '20px'}),
                         html.Div([
                              html.H4("Select Crime Category:", style={'marginTop': '10px', 'textAlign': 'center'}),
                              dcc.RadioItems(
-                                id="state-category-radio", # Changed ID slightly
-                                options=[{"label": k.upper(), "value": k} for k in dataframes.keys()], # Use keys from dataframes dict
+                                id="state-category-radio", 
+                                options=[{"label": k.upper(), "value": k} for k in dataframes.keys()], 
                                 value="ipc", # Default value
                                 labelStyle=radio_label_style,
                                 style=radio_style,
-                                inputStyle={"marginRight": "5px"} # Space between radio circle and label
+                                inputStyle={"marginRight": "5px"} 
                              )
                         ], style={'marginBottom': '20px'}),
-                        dcc.Loading( # Added Loading wrapper
+                        dcc.Loading(
                             id="loading-state-map",
                             type="circle",
-                            children=dcc.Graph(id="state-map", style={'width': '100%', 'height': '65vh'}, responsive=True) # Reduced height slightly
+                            children=dcc.Graph(id="state-map", style={'width': '100%', 'height': '65vh'}, responsive=True) 
                         ),
                         dcc.Store(id="selected-state-store"),
                         html.Div(id="selected-state-display", style={'fontWeight': 'bold', 'marginTop': '15px', 'textAlign':'center', 'fontSize':'1.1em'}),
                         html.Div(id="state-analysis-options", style={'marginTop': '20px', 'padding': '15px', 'backgroundColor': '#f8f9fa', 'borderRadius': '5px'}),
-                        dcc.Loading( # Added Loading wrapper
+                        dcc.Loading( 
                             id="loading-state-visualizations",
-                            type="graph", # Different loading indicator
+                            type="circle", 
                             children=html.Div(id="state-visualizations-container", style={'marginTop': '20px'})
                         )
-                        # --- End of content ---
                     ], style={'padding': '25px'})
                 ]), # End State Wise Tab
 
                 # === District Wise Tab ===
-                # Make sure the 'value' here matches the link id prefix ('tab-districtwise')
                 dcc.Tab(label="District Wise", value='tab-districtwise', children=[
                     html.Div([
-                         # --- Content from your original 'District Wise' tab ---
                         html.H3("District Level Crime Analysis", style={'textAlign': 'center', 'marginBottom': '20px'}),
                         html.Div([
                             html.Div([
                                 html.Label("Select Crime Category:", style={'fontWeight': 'bold'}),
                                 dcc.RadioItems(
-                                    id="district-category-radio", # Unique ID
+                                    id="district-category-radio", 
                                     options=[{"label": k.upper(), "value": k} for k in dataframes.keys()],
-                                    value="ipc", # Default value
+                                    value="ipc", 
                                     labelStyle={'display': 'inline-block', 'marginRight': '15px', 'cursor': 'pointer'},
                                     style={'textAlign': 'center', 'marginBottom': '10px'}
                                 )
@@ -1025,7 +882,7 @@ app.layout = html.Div([
                                     dcc.RangeSlider(
                                         id='district-year-slider',
                                         step=1,
-                                        marks=None, # Marks set dynamically
+                                        marks=None, 
                                         tooltip={"placement": "bottom", "always_visible": True},
                                         allowCross=False
                                     )
@@ -1035,7 +892,7 @@ app.layout = html.Div([
                                     html.Label("Select Specific Crime (Optional):", style={'fontWeight': 'bold'}),
                                     dcc.Dropdown(
                                         id='district-crime-dropdown',
-                                        options=[], # Populated by callback
+                                        options=[], 
                                         placeholder="Select specific crime type (defaults to Total Crimes)",
                                         clearable=True,
                                         style=dropdown_style
@@ -1048,37 +905,37 @@ app.layout = html.Div([
                              dcc.Loading(
                                 id="loading-district-map",
                                 type="circle",
-                                children=dcc.Graph(id="district-map", style={'height': '70vh'}, responsive=True) # Adjusted height
+                                children=dcc.Graph(id="district-map", style={'height': '70vh'}, responsive=True) 
                             )
                         ], style={'marginBottom': '25px'}),
                         html.Div([
                              html.H4("Detailed District Analysis", style={'textAlign': 'center', 'borderBottom': '1px solid #ddd', 'paddingBottom': '10px', 'marginBottom': '20px'}),
-                             dcc.Store(id="selected-district-store"), # Store selected district name
+                             dcc.Store(id="selected-district-store"), 
                              html.Div(id="selected-district-display", style={'fontWeight': 'bold', 'textAlign': 'center', 'fontSize': '1.2em', 'marginBottom': '15px'}),
                              dcc.Loading(
                                 id="loading-district-details",
                                 type="circle",
-                                children=html.Div(id="district-detail-graphs") # Container for time series, breakdown etc.
+                                children=html.Div(id="district-detail-graphs")
                             )
-                        ], style={'padding': '20px', 'backgroundColor': '#f0f0f0', 'borderRadius': '5px', 'marginBottom': '25px', 'minHeight': '200px'}), # Added minHeight
+                        ], style={'padding': '20px', 'backgroundColor': '#f0f0f0', 'borderRadius': '5px', 'marginBottom': '25px', 'minHeight': '200px'}), 
                         html.Div([
                             html.H4("Compare Districts", style={'textAlign': 'center', 'borderBottom': '1px solid #ddd', 'paddingBottom': '10px', 'marginBottom': '20px'}),
                             html.Div([
                                 html.Div([
                                     html.Label("Select Districts to Compare (2 or more):", style={'fontWeight': 'bold'}),
                                     dcc.Dropdown(
-                                        id='compare-districts-multi', # Correct ID matching the callbacks
-                                        options=[], # Options populated by callback
+                                        id='compare-districts-multi', 
+                                        options=[], 
                                         placeholder="Select Districts",
-                                        multi=True, # Enable multi-selection
+                                        multi=True, 
                                         style=dropdown_style
                                     )
-                                ], style={'width': '98%', 'display': 'inline-block'}), # Adjust width as needed
+                                ], style={'width': '98%', 'display': 'inline-block'}), 
                             ], style={'marginBottom': '20px'}),
                             dcc.Loading(
                                 id="loading-district-comparison",
                                 type="circle",
-                                children=html.Div(id="district-comparison-graphs") # Container for comparison plots
+                                children=html.Div(id="district-comparison-graphs") 
                             )
                         ], style={'padding': '20px', 'backgroundColor': '#f0f0f0', 'borderRadius': '5px', 'marginBottom': '25px', 'minHeight': '200px'}), # Added minHeight
                          html.Div([
@@ -1088,7 +945,7 @@ app.layout = html.Div([
                                      html.Label("Select Crime for Hotspot Analysis:", style={'fontWeight': 'bold'}),
                                      dcc.Dropdown(
                                          id='crime-hotspot-dropdown',
-                                         options=[], # Populated based on category
+                                         options=[], 
                                          placeholder="Select Crime Type",
                                          style=dropdown_style
                                      )
@@ -1106,17 +963,15 @@ app.layout = html.Div([
                              dcc.Loading(
                                  id="loading-crime-comparison",
                                  type="circle",
-                                 children=html.Div(id="crime-comparison-graphs") # Container for hotspot bar chart
+                                 children=html.Div(id="crime-comparison-graphs")
                              )
-                         ], style={'padding': '20px', 'backgroundColor': '#f0f0f0', 'borderRadius': '5px', 'minHeight': '200px'}), # Added minHeight
-                         # --- End of content ---
+                         ], style={'padding': '20px', 'backgroundColor': '#f0f0f0', 'borderRadius': '5px', 'minHeight': '200px'}), 
                     ], style={'padding': '25px'})
                 ]), # End District Wise Tab
 
                 # === Year Wise Tab ===
                 dcc.Tab(label="Year Wise", value='tab-yearwise', children=[
                      html.Div([
-                         # --- Content from your original 'Year Wise' tab ---
                         html.H3("Year-wise Crime Data Analysis", style={'textAlign': 'center', 'marginBottom': '20px'}),
                         html.Div([
                             html.H4("Select Year Range:"),
@@ -1128,7 +983,7 @@ app.layout = html.Div([
                                       max([int(y) for df in dataframes.values() for y in df["YEAR"].unique()])],
                                 marks={int(year): {'label': str(year), 'style': {'transform': 'rotate(45deg)', 'color': '#1f77b4', 'whiteSpace': 'nowrap'}}
                                       for year in sorted([int(y) for df in dataframes.values() for y in df["YEAR"].unique()])}, # Combine years
-                                step=1, # Allow stepping by 1 year
+                                step=1, 
                                 tooltip={"placement": "bottom", "always_visible": True}
                             ),
 
@@ -1145,7 +1000,7 @@ app.layout = html.Div([
                             html.H4("Select Crime Type:", style={'marginTop': '20px'}),
                             dcc.Dropdown(
                                 id="year-crime-type-dropdown",
-                                style=dropdown_style # Use common style
+                                style=dropdown_style 
                             ),
                             html.H4("Select Visualization Type:", style={'marginTop': '20px'}),
                             dcc.RadioItems(
@@ -1156,31 +1011,28 @@ app.layout = html.Div([
                                     {"label": "Crime Type Breakdown", "value": "crime_breakdown"}
                                 ],
                                 value="trend",
-                                labelStyle=radio_label_style, # Use common style
-                                style=radio_style, # Use common style
+                                labelStyle=radio_label_style, 
+                                style=radio_style, 
                                 inputStyle={"marginRight": "5px"}
                             ),
                         ]),
-                        dcc.Loading( # Added Loading wrapper
+                        dcc.Loading( 
                              id="loading-year-visualizations",
                              type="circle",
                              children=html.Div(id="year-visualizations-container", style={'marginTop': '20px'})
                         )
-                        # --- End of content ---
+                        
                     ], style={'padding': '25px'})
                 ]), # End Year Wise Tab
 
                 # === Area Comparison Tab ===
                 dcc.Tab(label="Area Comparison", value='tab-areacomparison', children=[
-                    # --- Content from your original 'Area Comparison' tab ---
-                    area_comparison_layout # Assumes this variable is defined as before
-                    # --- End of content ---
+                    area_comparison_layout 
                 ]),
 
                 # === Place Occurrence Tab ===
                 dcc.Tab(label="Place Occurrence", value='tab-placeoccurrence', children=[
                     html.Div([
-                        # --- Content from your original 'Place Occurrence' tab ---
                         html.H3("Crime by Place of Occurrence (2001–2012)", style={'textAlign': 'center', 'marginBottom': '20px'}),
                         html.Label("Select Year Range:", style={'fontWeight':'bold'}),
                         dcc.RangeSlider(
@@ -1195,19 +1047,17 @@ app.layout = html.Div([
                         html.Br(),
                         dcc.Loading(id='loading-place-sunburst', type='circle',children=[dcc.Graph(id='place-sunburst')]),
                         dcc.Loading(id='loading-place-multiples', type='circle',children=[dcc.Graph(id='place-small-multiples')]),
-                        # --- End of content ---
                     ], style={'padding':'1rem'})
                 ]), # End Place Occurrence Tab
 
                 # === Murder Victims Tab ===
                 dcc.Tab(label="Murder Victims Flow", value='tab-murderflow', children=[
                     html.Div([
-                         # --- Content from your original 'Murder Victims' tab ---
                         html.H3("Murder Victims Flow Analysis (State → Gender → Age)", style={'textAlign': 'center', 'marginBottom': '20px'}),
                         html.Div([
                             html.Label("Select Year:", style={'fontWeight':'bold'}),
                             dcc.Dropdown(
-                                id='year-dropdown-new', # ID from your original file
+                                id='year-dropdown-new', 
                                 options=[{'label': str(year), 'value': year} for year in sorted(df_murder['Year'].unique())],
                                 value=df_murder['Year'].max(),
                                 clearable=False
@@ -1216,7 +1066,7 @@ app.layout = html.Div([
                         html.Div([
                             html.Label("Select Number of Top States (by total victims):", style={'fontWeight':'bold'}),
                             dcc.Slider(
-                                id='states-slider', # ID from your original file
+                                id='states-slider', 
                                 min=5,
                                 max=len(df_murder['Area_Name'].unique()),
                                 step=1,
@@ -1226,33 +1076,28 @@ app.layout = html.Div([
                             ),
                         ], style={'width': '70%', 'marginTop': '20px', 'marginBottom': '20px'}),
                         dcc.Loading(id='loading-sankey', type = 'circle',children=[dcc.Graph(id='sankey-diagram', style={'height': '700px'})])
-                        # --- End of content ---
                     ], style={'padding': '1rem'})
                 ]), # End Murder Victims Tab
 
                 # === Offender Relationships Tab ===
                 dcc.Tab(label="Offender Relationships", value='tab-offenderrel', children=[
                     html.Div([
-                        # --- Content from your original 'Offender Relationships' tab ---
                         html.H3("Offenders Known to the Victim", style={'textAlign': 'center', 'marginBottom': '20px'}),
                         html.P("Treemap showing breakdown of known offender categories across states.", style={'textAlign': 'center', 'marginBottom': '15px'}),
                         html.Label("Select Number of Top States (by total cases):", style={'fontWeight':'bold'}),
                         dcc.Slider(
-                            id='rel-top-n', # ID from your original file
+                            id='rel-top-n', 
                             min=5, max=30, step=5, value=15,
                             marks={i: str(i) for i in [5,10,15,20,25,30]},
                             tooltip={'placement':'bottom', 'always_visible': True}
                         ),
                          dcc.Loading(id='loading-relative-treemap', type='circle',children=[dcc.Graph(id='relative-treemap', style={'marginTop': '20px'})])
-                        # --- End of content ---
                     ], style={'padding':'1rem'})
                 ]), # End Offender Relationships Tab
 
                 # === Crime Clusters Tab ===
-                 # Assuming value='tab-clusters' based on previous structure
                 dcc.Tab(label="Crime Clusters (IPC)", value='tab-clusters', children=[
                     html.Div([
-                        # --- Content from your original 'Crime Clusters' tab ---
                         html.H3("K‑Means Clustering of Districts based on IPC Crimes", style={'textAlign': 'center', 'marginBottom': '20px'}),
                         html.P("Select crime types (features will be scaled) and number of clusters. Clustering uses mean values across all years.", style={'textAlign': 'center', 'marginBottom': '15px'}),
                         html.Div([
@@ -1260,7 +1105,7 @@ app.layout = html.Div([
                                 html.Label("Select IPC Crime Features:", style={'fontWeight':'bold'}),
                                 dcc.Dropdown(
                                     id='cluster-features',
-                                    options=[{'label': f.replace('_',' ').title(), 'value': f} for f in crime_features], # Assuming crime_features is defined
+                                    options=[{'label': f.replace('_',' ').title(), 'value': f} for f in crime_features], 
                                     value=crime_features[:5], # Default to first 5 features
                                     multi=True, style={'marginBottom': '15px'}
                                 ),
@@ -1299,15 +1144,12 @@ app.layout = html.Div([
                             html.H4("Cluster Crime Trends (IPC Total, incl. 1‑year ARIMA forecast)", style={'textAlign': 'center', 'marginTop': '20px'}),
                             dcc.Loading(id='loading-cluster-trends-total',type='circle', children=[dcc.Graph(id='cluster-trends-total', style={'height':'50vh'})]) # Trends Total
                         ]),
-                        # --- End of content ---
                     ], style={'padding':'1rem'})
                 ]), # End Crime Clusters Tab
 
                 # === Custodial Deaths Tab ===
-                # Assuming value='tab-custodial'
                 dcc.Tab(label="Custodial Deaths Plots", value='tab-custodial', children=[
                      html.Div([
-                         # --- Content from your original 'Custodial Deaths' tab ---
                         html.H3("Custodial Death Causes: Small Multiples vs National Total", style={'textAlign': 'center', 'marginBottom': '20px', 'marginTop': '80px'}),
                         html.Div([
                             html.Label("Chart type:"),
@@ -1322,15 +1164,12 @@ app.layout = html.Div([
                             dcc.Dropdown( id='state-select', options=STATE_OPTIONS, value=['Maharashtra','Uttar Pradesh','Gujarat','West Bengal','Tamil Nadu'], multi=True, placeholder="Choose states" )
                         ], style={'margin-bottom': '2em'}),
                         dcc.Graph(id='timeline-graph')
-                        # --- End of content ---
                     ])
                 ]),
 
                 # === Juvenile Plots Tab ===
-                 # Assuming value='tab-juvenile'
                 dcc.Tab(label="Juvenile Plots", value='tab-juvenile', children=[
                      html.Div([
-                         # --- Content from your original 'Juvenile Plots' tab ---
                         html.H3("Juvenile Arrests Breakdown", style={'textAlign': 'center', 'marginBottom': '20px'}),
                         dcc.Dropdown(
                             id="juv-category-dropdown",
@@ -1338,39 +1177,31 @@ app.layout = html.Div([
                             placeholder="Select one or more categories", multi=True
                         ),
                         html.Div(id="juv-plots-container", style={'marginTop': '20px'})
-                        # --- End of content ---
                     ], style={'padding': '25px'})
                 ]),
 
                 # === Unidentified Bodies Heatmap Tab ===
-                # Assuming value='tab-heatmap'
                 dcc.Tab(label="Unidentified Bodies Heatmap", value='tab-heatmap', children=[
                       html.Div([
-                          # --- Content from your original 'Unidentified Bodies' tab ---
                           dcc.Graph(id='heatmap', figure=fig_heat)
-                          # --- End of content ---
+                          
                       ], style={'width':'90%','margin':'auto'})
                 ]),
 
                 # === Serious Fraud Losses Tab ===
-                # Assuming value='tab-fraud'
                 dcc.Tab(label="Serious Fraud Losses", value='tab-fraud', children=[
                      html.Div([
-                         # --- Content from your original 'Serious Fraud' tab ---
                         html.H3("Serious Fraud Losses", style={'textAlign': 'center', 'marginBottom': '20px', 'marginTop':'60px'}),
                         dcc.Dropdown( id='year-dropdown', options=[{'label': y,'value': y} for y in years], value='All', clearable=False, style={'width':'80%','margin':'10px auto'}, placeholder='Select Year' ),
                         dcc.Dropdown( id='group-dropdown', options=[{'label': g,'value': g} for g in groups], value='All', clearable=False, style={'width':'80%','margin':'10px auto'} ),
                         dcc.Dropdown( id='state-dropdown', options=[{'label': s,'value': s} for s in states], value=default_states, multi=True, placeholder='Select states', style={'width':'80%','margin':'10px auto'} ),
                         dcc.Graph(id='bar-chart', style={'height':'70vh'})
-                        # --- End of content ---
                     ])
                 ]),
 
                 # === Property Stolen Analysis Tab ===
-                 # Assuming value='tab-stolen'
                 dcc.Tab(label="Property Stolen Analysis", value='tab-stolen', children=[
                      html.Div([
-                         # --- Content from your original 'Property Stolen' tab ---
                         html.H3("Property Stolen", style={'textAlign': 'center', 'marginBottom': '20px', 'marginTop':'60px'}),
                         html.Div([ html.Label("Year Range:"), dcc.RangeSlider( id='stolen-year-slider', min=yr_min, max=yr_max, step=1, marks={y: str(y) for y in range(yr_min, yr_max+1)}, value=default_range, tooltip={"always_visible": True} ) ], style={'width':'80%','margin':'auto','padding':'20px'}),
                         html.Div([ html.Label("Mode:"), dcc.RadioItems( id='stolen-mode', options=[ {'label':'Single State','value':'single'}, {'label':'Compare States','value':'multi'} ], value='single', labelStyle={'display':'inline-block','marginRight':'20px'} ) ], style={'textAlign':'center','padding':'10px'}),
@@ -1379,15 +1210,12 @@ app.layout = html.Div([
                             html.Div(id='multi-container', style={'display':'none'}, children=[ html.Label("Select 2–7 States:"), dcc.Dropdown( id='stolen-multi-dd', options=[{'label': s,'value': s} for s in avail_states], multi=True, placeholder="States..." ) ])
                         ]),
                         html.Div(id='stolen-plots-div', style={'padding':'20px'})
-                        # --- End of content ---
                     ])
                 ]),
 
                 # === Rape Victims Trend & Prediction Tab ===
-                 # Assuming value='tab-rape'
                 dcc.Tab(label="Rape Victims Trend & Prediction", value='tab-rape', children=[
                      html.Div([
-                         # --- Content from your original 'Rape Victims' tab ---
                         html.H3("Rape Victim Trend and Prediction for next year", style={'textAlign': 'center', 'marginBottom': '20px', 'marginTop':'60px'}),
                         html.Div([ html.Label('Select States'), dcc.Dropdown(id='test-state-dd', options=state_opts, value=['All States'], multi=True) ], style={'width':'48%','display':'inline-block'}),
                         html.Div([ html.Label('Select Subgroups'), dcc.Dropdown(id='test-sub-dd', options=sub_opts, value=['All Subgroups'], multi=True) ], style={'width':'48%','display':'inline-block'}),
@@ -1395,14 +1223,12 @@ app.layout = html.Div([
                         html.Label('Year Range'),
                         dcc.RangeSlider(id='test-year-slider', min=years[0], max=years[-1], step=1, value=[years[0], years[-1]], marks=marks),
                         dcc.Graph(id='test-time-series')
-                        # --- End of content ---
                     ], style={'padding':'20px'})
                 ]),
 
                  # === Kidnappings & Abductions Tab ===
                 dcc.Tab(label="Kidnappings & Abductions", value='tab-kidnapping', children=[
                       html.Div([
-                          # --- Content from your original 'Kidnappings' tab ---
                         html.H3("Kidnapping & Abduction Analysis", style={'textAlign': 'center', 'marginBottom': '20px', 'marginTop': '60px'}),
                         html.Div([
                             html.Label("Select Year Range:", style={'fontWeight':'bold'}),
@@ -1417,20 +1243,16 @@ app.layout = html.Div([
                             dcc.RadioItems( id="kidnap-viz-type-radio", options=[ {"label": "Trend Analysis", "value": "trend"}, {"label": "State Comparison (Counts)", "value": "state_comparison"}, {"label": "Purpose Profile Comparison (%)", "value": "profile_comparison"}, {"label": "Victim Demographics Breakdown", "value": "victim_demographics"}, ], value="trend", labelStyle=radio_label_style, style=radio_style, inputStyle={"marginRight": "5px"} ),
                         ], style={'width': '80%', 'margin': '0 auto', 'marginBottom':'20px'}),
                         dcc.Loading( id="loading-kidnap-visualizations", type="circle", children=html.Div(id="kidnap-visualizations-container", style={'marginTop': '20px'}) )
-                        # --- End of content ---
+                        
                     ], style={'padding': '25px'})
                 ]),
 
             ],
-            # Remove explicit styling from dcc.Tabs if it conflicts with hiding
-            # style={'marginBottom': '20px', 'backgroundColor': '#e9ecef', 'padding': '5px', 'borderRadius': '5px'}
         ), # End dcc.Tabs
-    # Use the styling from your original outer Div
     ], style={'padding': '15px', 'maxWidth': '1300px', 'margin': '0 auto', 'backgroundColor': '#ffffff',
               'borderRadius': '8px', 'boxShadow': '0 2px 5px rgba(0,0,0,0.1)'}),
 
-    # Removed the extra visualizations-container div from original layout if not needed
-    # --- Footer Section --- New Footer ---
+    # --- Footer Section --- Footer ---
     html.Footer([
         html.Span("WatchTower", className='footer-left'),
         # html.Span("Made with ❤️", className='footer-center'),
@@ -1451,17 +1273,13 @@ app.layout = html.Div([
             html.A("Parjanya Aditya Shukla", href="https://www.linkedin.com/in/parjanya-aditya-shukla/", target="_blank", className='footer-link'),
             html.Span(" | ", style={'margin': '0 5px'}), # Separator
             html.A("Prakhar Mandloi", href="https://www.linkedin.com/in/prakhar-mandloi-016851207/", target="_blank", className='footer-link'),
-            # Add more creators as needed, separated by Span or similar
-            # html.Span(" | ", style={'margin': '0 5px'}),
-            # html.A("Creator 3 Name", href="YOUR_LINKEDIN_URL_3", target="_blank", className='footer-link'),
         ], className='footer-right') # Assign class for styling
     ], className='app-footer')
-    # --- End Footer Section ---
 ]) # End app.layout
 
-# === Add these Callbacks after app.layout definition ===
+#===============================Callbacks for tabs and functionalities =======================================================
 
-# --- Clientside callback to toggle drawer visibility ---
+# Clientside callback to toggle drawer visibility 
 app.clientside_callback(
     ClientsideFunction(namespace='clientside', function_name='toggleDrawer'),
     Output("slide-out-drawer", "className"),
@@ -1473,33 +1291,28 @@ app.clientside_callback(
     prevent_initial_call=True
 )
 
-# --- Dynamically generate Inputs/Outputs/States for link callbacks ---
+# Dynamically generating Inputs/Outputs/States for link callbacks
 tab_values = []
 try:
-    # Find dcc.Tabs - adjust index if layout structure changes
-    # Based on your layout: outer Div -> dcc.Tabs
-    tabs_component = app.layout.children[1].children[0] # TBC based on final layout structure
+    tabs_component = app.layout.children[1].children[0] 
 
     if isinstance(tabs_component, dcc.Tabs) and hasattr(tabs_component, 'children'):
         for tab in tabs_component.children:
-             # Check if it's a Tab and has a value property
              if isinstance(tab, dcc.Tab) and hasattr(tab, 'value') and tab.value:
                 tab_values.append(tab.value)
-        if not tab_values: # Check if list is empty after loop
+        if not tab_values: 
             raise ValueError("No tab values extracted from layout.")
-        print(f"Successfully extracted tab values: {tab_values}")
+        # print(f"Successfully extracted tab values: {tab_values}")
     else:
         raise TypeError("Could not find dcc.Tabs component or its children as expected.")
 
 except (AttributeError, IndexError, TypeError, ValueError) as e:
-     print(f"Error introspecting layout for tab values: {e}. Falling back to manual list.")
-     # !! IMPORTANT: MANUALLY LIST ALL YOUR TAB VALUES HERE AS A FALLBACK !!
-     # These should match the 'value' props of your dcc.Tab components
+    #  print(f"Error introspecting layout for tab values: {e}. Falling back to manual list.")
      tab_values = [
          'tab-statewise', 'tab-districtwise', 'tab-yearwise', 'tab-areacomparison',
          'tab-placeoccurrence', 'tab-murderflow', 'tab-offenderrel', 'tab-clusters',
          'tab-custodial', 'tab-juvenile', 'tab-heatmap', 'tab-fraud', 'tab-stolen',
-         'tab-rape', 'tab-kidnapping' # Make sure these match YOUR tab values
+         'tab-rape', 'tab-kidnapping' 
      ]
 
 # Create Inputs for the link click callback

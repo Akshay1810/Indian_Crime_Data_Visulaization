@@ -1,0 +1,9 @@
+services:
+  - type: web # A long-running web service
+    name: dash-watchtower-web # Unique name for your service
+    env: python # Use Python runtime
+    plan: free # Use Render’s free tier
+    buildCommand: # Install your dependencies
+      pip install -r requirements.txt
+    startCommand: # Launch your Dash app via Gunicorn
+      gunicorn code_dashboard:server
